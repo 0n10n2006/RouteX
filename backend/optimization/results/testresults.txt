@@ -1,0 +1,86 @@
+PS C:\Users\nauma\Downloads\RouteX> & C:/Users/nauma/AppData/Local/Python/bin/python.exe c:/Users/nauma/Downloads/RouteX/backend/optimization/experiment.py
+
+================================
+SCENARIO: LOW
+================================
+Run 1/10 complete
+Run 2/10 complete
+Run 3/10 complete
+Run 4/10 complete
+Run 5/10 complete
+Run 6/10 complete
+Run 7/10 complete
+Run 8/10 complete
+Run 9/10 complete
+Run 10/10 complete
+
+===== RESULTS =====
+Greedy: 50.00 | Runtime: 0.000041s
+QPSO: 43.50 | Runtime: 0.005217s
+Hybrid: 43.00 | Runtime: 0.015692s
+
+===== IMPROVEMENT =====
+QPSO vs Greedy: 13.00%
+Hybrid vs Greedy: 14.00%
+Hybrid vs QPSO: 1.15%
+
+===== SUCCESS RATE =====
+QPSO beat Greedy: 10/10 (100.0%)
+Hybrid beat Greedy: 10/10 (100.0%)
+
+================================
+SCENARIO: MEDIUM
+================================
+Run 1/10 complete
+Run 2/10 complete
+Run 3/10 complete
+Run 4/10 complete
+Run 5/10 complete
+Run 6/10 complete
+Run 7/10 complete
+Run 8/10 complete
+Run 9/10 complete
+Run 10/10 complete
+
+===== RESULTS =====
+Greedy: 50.00 | Runtime: 0.000021s
+QPSO: 43.00 | Runtime: 0.004260s
+Hybrid: 43.00 | Runtime: 0.004213s
+
+===== IMPROVEMENT =====
+QPSO vs Greedy: 14.00%
+Hybrid vs Greedy: 14.00%
+Hybrid vs QPSO: 0.00%
+
+===== SUCCESS RATE =====
+QPSO beat Greedy: 10/10 (100.0%)
+Hybrid beat Greedy: 10/10 (100.0%)
+
+================================
+SCENARIO: HIGH
+================================
+Run 1/10 complete
+Run 2/10 complete
+Run 3/10 complete
+Run 4/10 complete
+Run 5/10 complete
+Run 6/10 complete
+Run 7/10 complete
+Run 8/10 complete
+Run 9/10 complete
+Run 10/10 complete
+
+===== RESULTS =====
+Greedy: 77.00 | Runtime: 0.000024s
+QPSO: 59.70 | Runtime: 0.005182s
+Hybrid: 59.00 | Runtime: 0.005028s
+
+===== IMPROVEMENT =====
+QPSO vs Greedy: 22.47%
+Hybrid vs Greedy: 23.38%
+Hybrid vs QPSO: 1.17%
+
+===== SUCCESS RATE =====
+QPSO beat Greedy: 10/10 (100.0%)
+Hybrid beat Greedy: 10/10 (100.0%)
+PS C:\Users\nauma\Downloads\RouteX> 
