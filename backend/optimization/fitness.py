@@ -9,8 +9,22 @@ def route_distance(route, distance_matrix):
 
     return total
 
+# previous fitness function, commented out for reference
+# def fitness(solution, problem):
+#     total_distance = 0
 
-def fitness(solution, problem):
+#     for route in solution:
+#         total_distance += route_distance(
+#             route,
+#             problem.distance_matrix
+#         )
+
+#     return {
+#         "fitness": total_distance,
+#         "distance": total_distance
+#     }
+
+def calculate_metrics(solution, problem):
     total_distance = 0
 
     for route in solution:
@@ -20,6 +34,12 @@ def fitness(solution, problem):
         )
 
     return {
-        "fitness": total_distance,
         "distance": total_distance
     }
+
+
+def fitness(solution, problem):
+    metrics = calculate_metrics(solution, problem)
+
+    return metrics["distance"]
+
