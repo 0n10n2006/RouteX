@@ -1,6 +1,7 @@
 from qpso_utils import decode_random_keys, create_routes
 from fitness import fitness
 from problem import ProblemInstance
+from constraints import validate
 
 import math
 import random
@@ -64,14 +65,20 @@ class QPSO:
             # Convert customer order → vehicle routes
             routes = create_routes(
                 customer_order,
-                len(problem.vehicles)
+                problem
             )
+            if routes is None:
+                particle.fitness = float("inf")
+                continue
 
             # Calculate fitness
-            score = fitness_function(
-                routes,
-                problem
-            )["fitness"]
+            if not validate(routes, problem):
+                score = float("inf")
+            else:
+                    score = fitness_function(
+                        routes,
+                        problem
+                    )
 
             particle.fitness = score
 
@@ -193,12 +200,29 @@ class QPSO:
             problem,
             fitness_function
         )
-
-        # Store best-so-far fitness
         self.convergence.append(
             self.global_best_fitness
         )
 
+
+    def get_best_solution(self, problem):
+
+        if self.global_best_position is None:
+            return None
+
+        customer_order = decode_random_keys(
+            self.global_best_position
+        )
+
+        routes = create_routes(
+            customer_order,
+            problem
+        )
+
+        return {
+            "routes": routes,
+            "fitness": self.global_best_fitness
+        }
 
 if __name__ == "__main__":
 

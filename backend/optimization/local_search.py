@@ -17,7 +17,7 @@ def two_opt(solution, problem, fitness_function):
     best_score = fitness_function(
         best_solution,
         problem
-    )["fitness"]
+    )
 
     improved = True
 
@@ -44,7 +44,7 @@ def two_opt(solution, problem, fitness_function):
                     candidate_score = fitness_function(
                         candidate_solution,
                         problem
-                    )["fitness"]
+                    )
 
                     if candidate_score < best_score:
 
