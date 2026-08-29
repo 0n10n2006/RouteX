@@ -1,6 +1,4 @@
 scenario_id,algorithm,travel_time,distance,congestion_penalty,fuel_cost,constraint_violations,runtime,iterations,best_fitness
-S1,Baseline,0,0,0,0,0,0,0,0
-S2,Baseline,0,0,0,0,0,0,0,0
-S3,Baseline,0,0,0,0,0,0,0,0
-S4,Baseline,0,0,0,0,0,0,0,0
-S5,Baseline,0,0,0,0,0,0,0,0
+low,Greedy VRP,0,48,0,0,0,1.750000228639692e-05,0,50
+medium,Greedy VRP,0,48,0,0,0,7.399998139590025e-06,0,50
+high,Greedy VRP,0,75,0,0,0,7.90000194683671e-06,0,77
