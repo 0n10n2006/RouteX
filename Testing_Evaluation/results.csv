@@ -1,0 +1,6 @@
+scenario_id,algorithm,travel_time,distance,congestion_penalty,fuel_cost,constraint_violations,runtime,iterations,best_fitness
+S1,Baseline,0,0,0,0,0,0,0,0
+S2,Baseline,0,0,0,0,0,0,0,0
+S3,Baseline,0,0,0,0,0,0,0,0
+S4,Baseline,0,0,0,0,0,0,0,0
+S5,Baseline,0,0,0,0,0,0,0,0
