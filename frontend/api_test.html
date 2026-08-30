@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RouteX — API Test</title>
+  <style>
+    :root { color-scheme: light; }
+    body {
+      font-family: system-ui, -apple-system, Arial, sans-serif;
+      background: #f4f6f8;
+      color: #1a1a1a;
+      max-width: 720px;
+      margin: 40px auto;
+      padding: 0 16px;
+    }
+    h1 { margin-bottom: 4px; }
+    p.sub { color: #666; margin-top: 0; }
+    button {
+      font-size: 15px;
+      padding: 10px 16px;
+      margin: 6px 8px 6px 0;
+      border: none;
+      border-radius: 8px;
+      background: #2563eb;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover { background: #1d4ed8; }
+    button.secondary { background: #64748b; }
+    button.secondary:hover { background: #475569; }
+    .card {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 16px;
+      margin-top: 16px;
+    }
+    .fitness { font-size: 28px; font-weight: 700; color: #2563eb; }
+    table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+    th, td { border: 1px solid #e2e8f0; padding: 6px 10px; text-align: left; font-size: 14px; }
+    th { background: #f1f5f9; }
+    .status { color: #666; font-size: 14px; min-height: 20px; }
+    code { background: #f1f5f9; padding: 2px 5px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>RouteX</h1>
+  <p class="sub">Tiny test page — talks to your FastAPI backend at <code>http://127.0.0.1:8000</code></p>
+
+  <label for="algo">Algorithm:</label>
+  <select id="algo">
+    <option value="qpso">QPSO (quantum-inspired)</option>
+    <option value="hybrid">Hybrid QPSO + 2-opt (flagship)</option>
+    <option value="greedy">Greedy (classical baseline)</option>
+  </select>
+  <label for="scenario">Scenario:</label>
+  <select id="scenario">
+    <option value="default">Default (test)</option>
+    <option value="low">Low demand</option>
+    <option value="medium">Medium demand</option>
+    <option value="high">High demand</option>
+    <option value="big">Big (6 customers, 3 vehicles)</option>
+  </select>
+  <br />
+  <button onclick="runOptimize()">Run (POST /optimize)</button>
+  <button class="secondary" onclick="loadResults()">Load past results (GET /results)</button>
+  <button class="secondary" onclick="loadComparison()">Compare algorithms</button>
+
+  <p class="status" id="status"></p>
+
+  <div class="card" id="latest" style="display:none;">
+    <div>Latest run fitness:</div>
+    <div class="fitness" id="fitnessValue">—</div>
+    <div style="color:#666; font-size:13px; margin-top:6px;" id="convergenceInfo"></div>
+  </div>
+
+  <div class="card" id="resultsCard" style="display:none;">
+    <strong>Saved runs (newest first)</strong>
+    <div id="resultsTable"></div>
+  </div>
+
+  <div class="card" id="comparisonCard" style="display:none;">
+    <strong>Best fitness per scenario + algorithm (lower = better, grouped by scenario)</strong>
+    <div id="comparisonTable"></div>
+  </div>
+
+  <script>
+    // The address of your backend. Change this if your server runs elsewhere.
+    const API = "http://127.0.0.1:8000";
+    const status = document.getElementById("status");
+
+    // Call POST /optimize -> runs the chosen algorithm on the backend -> returns JSON
+    async function runOptimize() {
+      const algorithm = document.getElementById("algo").value;
+      const scenario = document.getElementById("scenario").value;
+      status.textContent = "Running " + algorithm + " on the " + scenario + " scenario...";
+      try {
+        const res = await fetch(API + "/optimize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ algorithm: algorithm, scenario: scenario })
+        });
+        const data = await res.json();
+
+        document.getElementById("latest").style.display = "block";
+        document.getElementById("fitnessValue").textContent = data.fitness;
+        const conv = data.convergence || [];
+        const rt = (data.runtime === null || data.runtime === undefined) ? "?" : Number(data.runtime).toFixed(4);
+        const base = data.algorithm + " on \"" + data.scenario + "\" — runtime " + rt + "s. ";
+        document.getElementById("convergenceInfo").textContent =
+          conv.length
+            ? (base + "Convergence over " + conv.length + " iterations: " + conv.join(" → "))
+            : (base + "One-shot result (no convergence curve).");
+
+        status.textContent = "Done! " + data.algorithm + " on \"" + data.scenario + "\" finished and the result was saved.";
+        loadResults(); // refresh the table automatically
+      } catch (err) {
+        status.textContent = "Could not reach the API. Is your server running? (" + err + ")";
+      }
+    }
+
+    // Call GET /results -> reads saved runs from SQLite
+    async function loadResults() {
+      status.textContent = "Loading saved results...";
+      try {
+        const res = await fetch(API + "/results");
+        const data = await res.json();
+        const rows = data.results || [];
+
+        let html = "<table><tr><th>ID</th><th>Algorithm</th><th>Scenario</th><th>Fitness</th><th>Distance</th><th>Runtime (s)</th><th>Created</th></tr>";
+        for (const r of rows) {
+          const rt = (r.runtime === null || r.runtime === undefined) ? "—" : Number(r.runtime).toFixed(4);
+          const dist = (r.distance === null || r.distance === undefined) ? "—" : r.distance;
+          const scn = (r.scenario === null || r.scenario === undefined) ? "—" : r.scenario;
+          html += `<tr><td>${r.id}</td><td>${r.algorithm}</td><td>${scn}</td><td>${r.fitness}</td><td>${dist}</td><td>${rt}</td><td>${r.created_at}</td></tr>`;
+        }
+        html += "</table>";
+
+        document.getElementById("resultsCard").style.display = "block";
+        document.getElementById("resultsTable").innerHTML = html;
+        status.textContent = "Loaded " + rows.length + " saved run(s).";
+      } catch (err) {
+        status.textContent = "Could not reach the API. Is your server running? (" + err + ")";
+      }
+    }
+
+    // Call GET /results/comparison -> best fitness per algorithm
+    async function loadComparison() {
+      status.textContent = "Loading comparison...";
+      try {
+        const res = await fetch(API + "/results/comparison");
+        const data = await res.json();
+        const rows = data.comparison || [];
+
+        let html = "<table><tr><th>Rank</th><th>Scenario</th><th>Algorithm</th><th>Best fitness</th><th>Fastest runtime (s)</th><th>Runs</th></tr>";
+        rows.forEach((r, i) => {
+          const rt = (r.best_runtime === null || r.best_runtime === undefined) ? "—" : Number(r.best_runtime).toFixed(4);
+          const scn = (r.scenario === null || r.scenario === undefined) ? "—" : r.scenario;
+          html += `<tr><td>${i + 1}</td><td>${scn}</td><td>${r.algorithm}</td><td>${r.best_fitness}</td><td>${rt}</td><td>${r.runs}</td></tr>`;
+        });
+        html += "</table>";
+
+        document.getElementById("comparisonCard").style.display = "block";
+        document.getElementById("comparisonTable").innerHTML = html;
+        status.textContent = "Comparison ready (" + rows.length + " algorithm(s)).";
+      } catch (err) {
+        status.textContent = "Could not reach the API. Is your server running? (" + err + ")";
+      }
+    }
+  </script>
+</body>
+</html>

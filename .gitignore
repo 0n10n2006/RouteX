@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environment
+venv/
+.venv/
+
+# Environment variables / secrets
+.env
+
+# SQLite databases (auto-created by create_tables())
+*.db
+
+# macOS
+.DS_Store

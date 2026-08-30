@@ -1,4 +1,9 @@
-from problem import ProblemInstance
+try:
+    # When imported as part of the backend package (e.g. by the FastAPI app)
+    from .problem import ProblemInstance
+except ImportError:
+    # When run directly from inside the optimization/ folder: python scenarios.py
+    from problem import ProblemInstance
 
 
 def create_scenarios():
