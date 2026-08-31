@@ -45,13 +45,17 @@ def hybrid_qpso(problem, num_particles=10, iterations=20, beta=0.5):
         return {
             "algorithm": "Hybrid QPSO + 2-opt",
             "routes": qpso_result["routes"],
-            "fitness": qpso_result["fitness"]
+            "fitness": qpso_result["fitness"],
+            # Convergence of the QPSO phase (added so the API can chart it).
+            "convergence": qpso.convergence
         }
 
     return {
         "algorithm": "Hybrid QPSO + 2-opt",
         "routes": improved_routes,
-        "fitness": improved_score
+        "fitness": improved_score,
+        # Convergence of the QPSO phase (added so the API can chart it).
+        "convergence": qpso.convergence
     }
 
 if __name__ == "__main__":

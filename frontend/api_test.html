@@ -66,6 +66,7 @@
   <button onclick="runOptimize()">Run (POST /optimize)</button>
   <button class="secondary" onclick="loadResults()">Load past results (GET /results)</button>
   <button class="secondary" onclick="loadComparison()">Compare algorithms</button>
+  <button onclick="runBenchmark()">Run full benchmark (POST /benchmark)</button>
 
   <p class="status" id="status"></p>
 
@@ -73,6 +74,8 @@
     <div>Latest run fitness:</div>
     <div class="fitness" id="fitnessValue">—</div>
     <div style="color:#666; font-size:13px; margin-top:6px;" id="convergenceInfo"></div>
+    <div id="routeList" style="margin-top:12px;"></div>
+    <canvas id="convergenceChart" width="680" height="220" style="display:none; max-width:100%; margin-top:12px; border:1px solid #e2e8f0; border-radius:8px;"></canvas>
   </div>
 
   <div class="card" id="resultsCard" style="display:none;">
@@ -85,10 +88,100 @@
     <div id="comparisonTable"></div>
   </div>
 
+  <div class="card" id="benchmarkCard" style="display:none;">
+    <strong>Full benchmark — every algorithm on every scenario (best first per scenario)</strong>
+    <div id="benchmarkTable"></div>
+  </div>
+
   <script>
     // The address of your backend. Change this if your server runs elsewhere.
     const API = "http://127.0.0.1:8000";
     const status = document.getElementById("status");
+
+    function escapeHtml(value) {
+      return String(value ?? "—").replace(/[&<>'"]/g, char => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;"
+      })[char]);
+    }
+
+    function showRoutes(routes) {
+      const list = document.getElementById("routeList");
+      if (!routes || !routes.length) {
+        list.innerHTML = "<strong>Routes:</strong> No route data returned.";
+        return;
+      }
+      list.innerHTML = "<strong>Routes:</strong><ol>" + routes.map((route, index) =>
+        "<li>Vehicle " + (index + 1) + ": " + escapeHtml(Array.isArray(route) ? route.join(" → ") : route) + "</li>"
+      ).join("") + "</ol>";
+    }
+
+    function drawConvergence(values) {
+      const chart = document.getElementById("convergenceChart");
+      if (!values || values.length < 2) {
+        chart.style.display = "none";
+        return;
+      }
+      const points = values.map(Number).filter(Number.isFinite);
+      if (points.length < 2) {
+        chart.style.display = "none";
+        return;
+      }
+      const context = chart.getContext("2d");
+      const width = chart.width, height = chart.height, padding = 32;
+      const minimum = Math.min(...points), maximum = Math.max(...points);
+      const spread = maximum - minimum || 1;
+      context.clearRect(0, 0, width, height);
+      context.strokeStyle = "#cbd5e1";
+      context.beginPath();
+      context.moveTo(padding, padding);
+      context.lineTo(padding, height - padding);
+      context.lineTo(width - padding, height - padding);
+      context.stroke();
+      context.strokeStyle = "#2563eb";
+      context.lineWidth = 2;
+      context.beginPath();
+      points.forEach((value, index) => {
+        const x = padding + index * (width - 2 * padding) / (points.length - 1);
+        const y = height - padding - (value - minimum) * (height - 2 * padding) / spread;
+        index ? context.lineTo(x, y) : context.moveTo(x, y);
+      });
+      context.stroke();
+      context.fillStyle = "#475569";
+      context.font = "12px system-ui";
+      context.fillText("Best: " + minimum, padding, 18);
+      context.fillText("Start: " + points[0], width - 110, 18);
+      chart.style.display = "block";
+    }
+
+    function showRun(data) {
+      document.getElementById("latest").style.display = "block";
+      document.getElementById("fitnessValue").textContent = data.fitness ?? "—";
+      const conv = data.convergence || [];
+      const rt = (data.runtime === null || data.runtime === undefined) ? "?" : Number(data.runtime).toFixed(4);
+      const base = (data.algorithm || "Run") + " on \"" + (data.scenario || "default") + "\" — runtime " + rt + "s. ";
+      document.getElementById("convergenceInfo").textContent = conv.length
+        ? (base + "Convergence over " + conv.length + " iterations.")
+        : (base + "One-shot result (no convergence curve).");
+      showRoutes(data.routes);
+      drawConvergence(conv);
+    }
+
+    async function loadScenarios() {
+      try {
+        const res = await fetch(API + "/scenarios");
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+        const scenarios = data.scenarios || [];
+        const select = document.getElementById("scenario");
+        const selected = select.value;
+        select.innerHTML = scenarios.map(s =>
+          `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)} (${escapeHtml(s.num_customers)} customers, ${escapeHtml(s.num_vehicles)} vehicles)</option>`
+        ).join("");
+        if (scenarios.some(s => s.name === selected)) select.value = selected;
+      } catch (err) {
+        status.textContent = "Could not load scenarios; using the built-in list. (" + err + ")";
+      }
+    }
 
     // Call POST /optimize -> runs the chosen algorithm on the backend -> returns JSON
     async function runOptimize() {
@@ -103,15 +196,8 @@
         });
         const data = await res.json();
 
-        document.getElementById("latest").style.display = "block";
-        document.getElementById("fitnessValue").textContent = data.fitness;
-        const conv = data.convergence || [];
-        const rt = (data.runtime === null || data.runtime === undefined) ? "?" : Number(data.runtime).toFixed(4);
-        const base = data.algorithm + " on \"" + data.scenario + "\" — runtime " + rt + "s. ";
-        document.getElementById("convergenceInfo").textContent =
-          conv.length
-            ? (base + "Convergence over " + conv.length + " iterations: " + conv.join(" → "))
-            : (base + "One-shot result (no convergence curve).");
+        if (!res.ok) throw new Error(data.detail || "HTTP " + res.status);
+        showRun(data);
 
         status.textContent = "Done! " + data.algorithm + " on \"" + data.scenario + "\" finished and the result was saved.";
         loadResults(); // refresh the table automatically
@@ -128,12 +214,12 @@
         const data = await res.json();
         const rows = data.results || [];
 
-        let html = "<table><tr><th>ID</th><th>Algorithm</th><th>Scenario</th><th>Fitness</th><th>Distance</th><th>Runtime (s)</th><th>Created</th></tr>";
+        let html = "<table><tr><th>ID</th><th>Algorithm</th><th>Scenario</th><th>Fitness</th><th>Distance</th><th>Runtime (s)</th><th>Created</th><th>Route / curve</th></tr>";
         for (const r of rows) {
           const rt = (r.runtime === null || r.runtime === undefined) ? "—" : Number(r.runtime).toFixed(4);
           const dist = (r.distance === null || r.distance === undefined) ? "—" : r.distance;
           const scn = (r.scenario === null || r.scenario === undefined) ? "—" : r.scenario;
-          html += `<tr><td>${r.id}</td><td>${r.algorithm}</td><td>${scn}</td><td>${r.fitness}</td><td>${dist}</td><td>${rt}</td><td>${r.created_at}</td></tr>`;
+          html += `<tr><td>${escapeHtml(r.id)}</td><td>${escapeHtml(r.algorithm)}</td><td>${escapeHtml(scn)}</td><td>${escapeHtml(r.fitness)}</td><td>${escapeHtml(dist)}</td><td>${escapeHtml(rt)}</td><td>${escapeHtml(r.created_at)}</td><td><button class="secondary" onclick="viewRun(${Number(r.id)})">View</button></td></tr>`;
         }
         html += "</table>";
 
@@ -142,6 +228,19 @@
         status.textContent = "Loaded " + rows.length + " saved run(s).";
       } catch (err) {
         status.textContent = "Could not reach the API. Is your server running? (" + err + ")";
+      }
+    }
+
+    async function viewRun(runId) {
+      status.textContent = "Loading run " + runId + "...";
+      try {
+        const res = await fetch(API + "/results/" + runId);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "HTTP " + res.status);
+        showRun(data);
+        status.textContent = "Showing routes and convergence for run " + runId + ".";
+      } catch (err) {
+        status.textContent = "Could not load run " + runId + ". (" + err + ")";
       }
     }
 
@@ -168,6 +267,34 @@
         status.textContent = "Could not reach the API. Is your server running? (" + err + ")";
       }
     }
+    // Call POST /benchmark -> runs every algorithm on every scenario, saves all, returns them
+    async function runBenchmark() {
+      status.textContent = "Running full benchmark (all algorithms × all scenarios)... this takes a moment.";
+      try {
+        const res = await fetch(API + "/benchmark", { method: "POST" });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "HTTP " + res.status);
+        const rows = data.summary || [];
+
+        let html = "<table><tr><th>Scenario</th><th>Algorithm</th><th>Runs</th><th>Best fitness</th><th>Mean fitness</th><th>Mean runtime (s)</th><th>Improvement vs greedy</th></tr>";
+        for (const r of rows) {
+          const rt = (r.mean_runtime === null || r.mean_runtime === undefined) ? "—" : Number(r.mean_runtime).toFixed(4);
+          const improvement = r.improvement_vs_baseline_percent === null || r.improvement_vs_baseline_percent === undefined
+            ? "—" : r.improvement_vs_baseline_percent + "%";
+          html += `<tr><td>${escapeHtml(r.scenario)}</td><td>${escapeHtml(r.algorithm)}</td><td>${escapeHtml(r.runs)}</td><td>${escapeHtml(r.best_fitness)}</td><td>${escapeHtml(r.mean_fitness)}</td><td>${escapeHtml(rt)}</td><td>${escapeHtml(improvement)}</td></tr>`;
+        }
+        html += "</table>";
+
+        document.getElementById("benchmarkCard").style.display = "block";
+        document.getElementById("benchmarkTable").innerHTML = html;
+        status.textContent = "Benchmark done — " + (data.total_runs || rows.length) + " runs saved.";
+        loadComparison(); // refresh the grouped comparison too
+      } catch (err) {
+        status.textContent = "Could not reach the API. Is your server running? (" + err + ")";
+      }
+    }
+
+    loadScenarios();
   </script>
 </body>
 </html>
