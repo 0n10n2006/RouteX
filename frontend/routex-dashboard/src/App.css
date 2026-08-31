@@ -1,0 +1,171 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  background: #0b1020;
+  color: white;
+}
+
+.app {
+  min-height: 100vh;
+}
+
+.header {
+  padding: 35px 20px;
+  text-align: center;
+  background: linear-gradient(135deg, #111936, #182653);
+  border-bottom: 1px solid #29365f;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 42px;
+  color: #62d9ff;
+}
+
+.header p {
+  margin-top: 10px;
+  color: #aebbd8;
+  font-size: 16px;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 40px auto;
+  padding: 0 20px;
+}
+
+.controls {
+  display: flex;
+  gap: 20px;
+  align-items: end;
+  padding: 25px;
+  background: #121a31;
+  border: 1px solid #29365f;
+  border-radius: 14px;
+}
+
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.control label {
+  color: #9eafd0;
+  font-size: 14px;
+}
+
+select {
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #34436f;
+  background: #0b1020;
+  color: white;
+  font-size: 15px;
+}
+
+.optimize-button {
+  padding: 13px 25px;
+  border: none;
+  border-radius: 8px;
+  background: #18b9e8;
+  color: #06101d;
+  font-weight: bold;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.optimize-button:hover {
+  background: #52d5fa;
+}
+
+.optimize-button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.error {
+  margin-top: 20px;
+  padding: 15px;
+  border-radius: 8px;
+  background: #451d28;
+  border: 1px solid #b83b55;
+  color: #ff9caf;
+}
+
+.results {
+  margin-top: 30px;
+}
+
+.results h2 {
+  margin-bottom: 20px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+}
+
+.card {
+  padding: 20px;
+  background: #121a31;
+  border: 1px solid #29365f;
+  border-radius: 12px;
+}
+
+.card span {
+  display: block;
+  color: #8999bc;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.card strong {
+  font-size: 22px;
+  color: #62d9ff;
+}
+
+.route-box,
+.convergence-box {
+  margin-top: 20px;
+  padding: 22px;
+  background: #121a31;
+  border: 1px solid #29365f;
+  border-radius: 12px;
+}
+
+.route-box h3,
+.convergence-box h3 {
+  margin-top: 0;
+}
+
+.route-box p {
+  color: #7ff0b2;
+  font-family: monospace;
+  font-size: 16px;
+}
+
+.convergence-list {
+  max-height: 250px;
+  overflow-y: auto;
+  color: #aebbd8;
+  font-family: monospace;
+  line-height: 1.8;
+}
+
+@media (max-width: 700px) {
+  .controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cards {
+    grid-template-columns: 1fr;
+  }
+}
