@@ -13,64 +13,53 @@ from backend.optimization.pso import ParticleSwarmOptimization
 from backend.optimization.qpso import QPSO
 from backend.optimization.hybrid import hybrid_qpso
 
-
-# ==========================================================
-# SCENARIOS
-# ==========================================================
+from Testing_Evaluation.traffic_model import get_traffic_factor
 
 scenarios = [
-    {
-        "id": "S1",
-        "demand": "Low",
-        "traffic": "Low",
-        "incident": False,
-        "vehicles": 3,
-        "delivery_points": 10
-    },
-    {
-        "id": "S2",
-        "demand": "Medium",
-        "traffic": "Medium",
-        "incident": False,
-        "vehicles": 5,
-        "delivery_points": 15
-    },
-    {
-        "id": "S3",
-        "demand": "High",
-        "traffic": "High",
-        "incident": False,
-        "vehicles": 10,
-        "delivery_points": 25
-    },
-    {
-        "id": "S4",
-        "demand": "Medium",
-        "traffic": "High",
-        "incident": True,
-        "vehicles": 5,
-        "delivery_points": 15
-    },
-    {
-        "id": "S5",
-        "demand": "High",
-        "traffic": "High",
-        "incident": True,
-        "vehicles": 10,
-        "delivery_points": 25
-    }
+{
+"id": "S1",
+"demand": "Low",
+"traffic": "Low",
+"incident": False,
+"vehicles": 3,
+"delivery_points": 10
+},
+{
+"id": "S2",
+"demand": "Medium",
+"traffic": "Medium",
+"incident": False,
+"vehicles": 5,
+"delivery_points": 15
+},
+{
+"id": "S3",
+"demand": "High",
+"traffic": "High",
+"incident": False,
+"vehicles": 10,
+"delivery_points": 25
+},
+{
+"id": "S4",
+"demand": "Medium",
+"traffic": "High",
+"incident": True,
+"vehicles": 5,
+"delivery_points": 15
+},
+{
+"id": "S5",
+"demand": "High",
+"traffic": "High",
+"incident": True,
+"vehicles": 10,
+"delivery_points": 25
+}
 ]
-
-
-# ==========================================================
-# CREATE DISTANCE MATRIX
-# ==========================================================
-
 def create_distance_matrix(num_points, traffic, incident, seed):
-
     random.seed(seed)
 
-    # Generate coordinates
     coordinates = []
 
     for _ in range(num_points):
@@ -78,23 +67,14 @@ def create_distance_matrix(num_points, traffic, incident, seed):
         y = random.randint(0, 100)
         coordinates.append((x, y))
 
-    # Traffic multiplier
-    traffic_factor = {
-        "Low": 1.0,
-        "Medium": 1.2,
-        "High": 1.5
-    }
-
-    factor = traffic_factor[traffic]
+    factor = get_traffic_factor(traffic)
 
     matrix = []
 
     for i in range(num_points):
-
         row = []
 
         for j in range(num_points):
-
             if i == j:
                 row.append(0)
                 continue
@@ -107,11 +87,10 @@ def create_distance_matrix(num_points, traffic, incident, seed):
                 (y1 - y2) ** 2
             )
 
-            distance = distance * factor
+            distance *= factor
 
-            # Incident increases some road costs
             if incident and (i + j) % 5 == 0:
-                distance = distance * 1.8
+                distance *= 1.8
 
             row.append(round(distance, 2))
 
@@ -119,13 +98,7 @@ def create_distance_matrix(num_points, traffic, incident, seed):
 
     return matrix
 
-
-# ==========================================================
-# CREATE PROBLEM FOR EACH SCENARIO
-# ==========================================================
-
 def create_problem(scenario):
-
     num_customers = scenario["delivery_points"]
 
     distance_matrix = create_distance_matrix(
@@ -135,7 +108,6 @@ def create_problem(scenario):
         seed=100 + num_customers
     )
 
-    # Demand ranges
     demand_range = {
         "Low": (1, 2),
         "Medium": (2, 4),
@@ -149,13 +121,11 @@ def create_problem(scenario):
     random.seed(200 + num_customers)
 
     for customer_id in range(1, num_customers + 1):
-
         customers.append({
             "id": customer_id,
             "demand": random.randint(low, high)
         })
 
-    # Vehicle capacity
     if scenario["demand"] == "Low":
         capacity = 15
     elif scenario["demand"] == "Medium":
@@ -166,7 +136,6 @@ def create_problem(scenario):
     vehicles = []
 
     for vehicle_id in range(1, scenario["vehicles"] + 1):
-
         vehicles.append({
             "id": vehicle_id,
             "capacity": capacity
@@ -179,24 +148,14 @@ def create_problem(scenario):
     )
 
 
-# ==========================================================
-# RUN ONE ALGORITHM
-# ==========================================================
-
 def run_algorithm(name, problem):
-
     start_time = time.perf_counter()
 
     routes = None
     best_fitness = float("inf")
     iterations = 0
 
-    # ------------------------------------------------------
-    # Greedy
-    # ------------------------------------------------------
-
     if name == "Greedy VRP":
-
         routes = greedy_vrp(problem)
 
         if routes and validate(routes, problem):
@@ -204,12 +163,7 @@ def run_algorithm(name, problem):
 
         iterations = 0
 
-    # ------------------------------------------------------
-    # GA
-    # ------------------------------------------------------
-
     elif name == "GA":
-
         algorithm = GeneticAlgorithm(
             population_size=20,
             generations=50,
@@ -225,12 +179,7 @@ def run_algorithm(name, problem):
 
         iterations = 50
 
-    # ------------------------------------------------------
-    # PSO
-    # ------------------------------------------------------
-
     elif name == "PSO":
-
         algorithm = ParticleSwarmOptimization(
             num_particles=20,
             iterations=50,
@@ -247,12 +196,7 @@ def run_algorithm(name, problem):
 
         iterations = 50
 
-    # ------------------------------------------------------
-    # QPSO
-    # ------------------------------------------------------
-
     elif name == "QPSO":
-
         algorithm = QPSO(
             num_particles=20,
             num_customers=len(problem.customers)
@@ -261,7 +205,6 @@ def run_algorithm(name, problem):
         iterations = 50
 
         for _ in range(iterations):
-
             algorithm.step(
                 problem,
                 fitness,
@@ -274,12 +217,7 @@ def run_algorithm(name, problem):
             routes = result["routes"]
             best_fitness = result["fitness"]
 
-    # ------------------------------------------------------
-    # Hybrid QPSO
-    # ------------------------------------------------------
-
     elif name == "Hybrid QPSO":
-
         result = hybrid_qpso(
             problem,
             num_particles=20,
@@ -293,24 +231,12 @@ def run_algorithm(name, problem):
 
         iterations = 50
 
-    # ------------------------------------------------------
-    # Runtime
-    # ------------------------------------------------------
-
     runtime = time.perf_counter() - start_time
 
-    # ------------------------------------------------------
-    # Constraint validation
-    # ------------------------------------------------------
-
     if routes and validate(routes, problem):
-
         constraint_violations = 0
-
         distance = fitness(routes, problem)
-
     else:
-
         constraint_violations = 1
         distance = float("inf")
 
@@ -323,13 +249,7 @@ def run_algorithm(name, problem):
         "constraint_violations": constraint_violations
     }
 
-
-# ==========================================================
-# MAIN EXPERIMENT
-# ==========================================================
-
 def main():
-
     algorithms = [
         "Greedy VRP",
         "GA",
@@ -340,13 +260,8 @@ def main():
 
     results = []
 
-    # ======================================================
-    # RUN ALL SCENARIOS
-    # ======================================================
-
     for scenario in scenarios:
-
-        print("\n")
+        print()
         print("==============================================")
         print("Scenario:", scenario["id"])
         print("Demand:", scenario["demand"])
@@ -359,14 +274,10 @@ def main():
         problem = create_problem(scenario)
 
         for algorithm_name in algorithms:
+            random.seed(1000 + len(results))
 
-            # Make stochastic algorithms reproducible
-            random.seed(
-                1000
-                + len(results)
-            )
-
-            print("\nRunning:", algorithm_name)
+            print()
+            print("Running:", algorithm_name)
 
             result = run_algorithm(
                 algorithm_name,
@@ -394,25 +305,15 @@ def main():
                 "distance": result["distance"],
                 "runtime": result["runtime"],
                 "iterations": result["iterations"],
-                "constraint_violations":
-                    result["constraint_violations"]
+                "constraint_violations": result["constraint_violations"]
             })
-
-    # ======================================================
-    # SAVE CSV
-    # ======================================================
 
     output_file = (
         Path(__file__).resolve().parent
         / "scenario_benchmark_results.csv"
     )
 
-    with open(
-        output_file,
-        "w",
-        newline=""
-    ) as file:
-
+    with open(output_file, "w", newline="") as file:
         writer = csv.DictWriter(
             file,
             fieldnames=[
@@ -432,22 +333,14 @@ def main():
         )
 
         writer.writeheader()
-
         writer.writerows(results)
 
-    print("\n")
+    print()
     print("==============================================")
     print("SCENARIO BENCHMARK COMPLETED!")
     print("==============================================")
-    print(
-        "Results saved to:",
-        output_file
-    )
+    print("Results saved to:", output_file)
 
-
-# ==========================================================
-# START
-# ==========================================================
 
 if __name__ == "__main__":
     main()
