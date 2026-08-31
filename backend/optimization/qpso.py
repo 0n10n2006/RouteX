@@ -1,7 +1,7 @@
-from qpso_utils import decode_random_keys, create_routes
-from fitness import fitness
-from problem import ProblemInstance
-from constraints import validate
+from .qpso_utils import decode_random_keys, create_routes
+from .fitness import fitness
+from .problem import ProblemInstance
+from .constraints import validate
 
 import math
 import random

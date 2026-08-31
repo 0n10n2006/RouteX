@@ -1,6 +1,8 @@
 import time
 
 from qpso import QPSO
+from ga import GeneticAlgorithm # this is the new import statement for the Genetic Algorithm class
+from pso import ParticleSwarmOptimization # this is the new import statement for the Particle Swarm Optimization class
 from problem import ProblemInstance
 from greedy_vrp import greedy_vrp
 from fitness import fitness
@@ -61,6 +63,68 @@ def run_greedy(problem):
         "runtime": runtime
     }
 
+def run_ga(problem, population_size=20, generations=50):
+    start_time = time.perf_counter()
+
+    ga = GeneticAlgorithm(
+        population_size=population_size,
+        generations=generations
+    )
+
+    result = ga.solve(problem)
+
+    runtime = time.perf_counter() - start_time
+
+    if result is None or result["routes"] is None or not validate(
+        result["routes"],
+        problem
+    ):
+        return {
+            "algorithm": "GA",
+            "routes": [],
+            "fitness": float("inf"),
+            "runtime": runtime
+        }
+
+    return {
+        "algorithm": "GA",
+        "routes": result["routes"],
+        "fitness": result["fitness"],
+        "runtime": runtime
+    }
+
+
+def run_pso(problem, num_particles=20, iterations=50):
+    start_time = time.perf_counter()
+
+    pso = ParticleSwarmOptimization(
+        num_particles=num_particles,
+        iterations=iterations
+    )
+
+    result = pso.solve(problem)
+
+    runtime = time.perf_counter() - start_time
+
+    if result is None or result["routes"] is None or not validate(
+        result["routes"],
+        problem
+    ):
+        return {
+            "algorithm": "PSO",
+            "routes": [],
+            "fitness": float("inf"),
+            "runtime": runtime
+        }
+
+    return {
+        "algorithm": "PSO",
+        "routes": result["routes"],
+        "fitness": result["fitness"],
+        "runtime": runtime
+    }
+
+
 def run_qpso(problem, num_particles=10, iterations=20, beta=0.5):
 
     start_time = time.perf_counter()
@@ -95,6 +159,7 @@ def run_qpso(problem, num_particles=10, iterations=20, beta=0.5):
         "fitness": result["fitness"],
         "runtime": runtime
     }
+
 def evaluate_routes_with_dijkstra(routes, problem):
 
     total_distance = 0
@@ -183,3 +248,5 @@ if __name__ == "__main__":
 
     print("\nDijkstra evaluation of Greedy routes:")
     print("Distance:", dijkstra_distance)
+
+    
