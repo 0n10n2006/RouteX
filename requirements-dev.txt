@@ -1,0 +1,7 @@
+# Local test-only dependencies.
+# Install after requirements.txt with:
+# python -m pip install -r requirements-dev.txt
+
+-r requirements.txt
+pytest==9.1.1
+httpx>=0.28,<1.0

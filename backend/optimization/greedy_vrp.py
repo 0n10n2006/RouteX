@@ -1,3 +1,6 @@
+from .fitness import optimization_matrix
+
+
 def greedy_vrp(problem):
 
     unvisited = {
@@ -30,9 +33,7 @@ def greedy_vrp(problem):
                 if current_load + demand > vehicle["capacity"]:
                     continue
 
-                distance = (
-                    problem.distance_matrix[current_node][customer_id]
-                )
+                distance = optimization_matrix(problem)[current_node][customer_id]
 
                 if distance < nearest_distance:
 

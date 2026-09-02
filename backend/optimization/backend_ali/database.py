@@ -68,6 +68,7 @@ RUN_COLUMNS = {
     "travel_time": "REAL",
     "congestion_penalty": "REAL",
     "fuel_cost": "REAL",
+    "traffic_metadata": "TEXT",     # source, units and simulated traffic inputs
 }
 
 
@@ -136,6 +137,7 @@ def save_result(
     travel_time=None,
     congestion_penalty=None,
     fuel_cost=None,
+    traffic_metadata=None,
 ):
     """Save one algorithm run. Returns the new row's id."""
 
@@ -146,13 +148,15 @@ def save_result(
         INSERT INTO optimization_runs (
             algorithm, fitness, distance, runtime, scenario,
             routes, convergence, iterations, constraint_violations,
-            vehicles_used, seed, travel_time, congestion_penalty, fuel_cost
+            vehicles_used, seed, travel_time, congestion_penalty, fuel_cost,
+            traffic_metadata
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         algorithm, fitness_value, distance, runtime, scenario,
         _dumps(routes), _dumps(convergence), iterations, constraint_violations,
-        vehicles_used, seed, travel_time, congestion_penalty, fuel_cost
+        vehicles_used, seed, travel_time, congestion_penalty, fuel_cost,
+        _dumps(traffic_metadata)
     ))
 
     run_id = cursor.lastrowid
@@ -168,6 +172,7 @@ def _row_to_run(row):
     run = dict(row)
     run["routes"] = _loads(run.get("routes"), [])
     run["convergence"] = _loads(run.get("convergence"), [])
+    run["traffic_metadata"] = _loads(run.get("traffic_metadata"), None)
     return run
 
 

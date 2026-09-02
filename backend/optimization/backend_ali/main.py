@@ -24,9 +24,13 @@ from ..qpso import QPSO
 from ..greedy_vrp import greedy_vrp
 from ..hybrid import hybrid_qpso
 from ..scenarios import create_scenarios
-from ..fitness import fitness
+from ..fitness import calculate_metrics, fitness
 from ..problem import ProblemInstance
 from ..constraints import check_customer_visits, check_depot, check_capacity
+from ..traffic_scenarios import (
+    create_kothrud_problem,
+    create_kothrud_problem_with_incident,
+)
 
 from .database import (
     create_tables,
@@ -52,7 +56,7 @@ QPSO_BETA = 0.5
 # "greedy" is the classical baseline we measure improvement against.
 BASELINE_ALGORITHM = "Greedy (classical baseline)"
 ALL_ALGORITHMS = ["greedy", "qpso", "hybrid"]
-BUILTIN_SCENARIOS = ["default", "low", "medium", "high", "big"]
+BUILTIN_SCENARIOS = ["default", "low", "medium", "high", "big", "kothrud"]
 
 app = FastAPI(
     title="RouteX API",
@@ -84,6 +88,12 @@ class BenchmarkRequest(BaseModel):
     seeds: int = 3                   # how many seeded repeats per combination
     scenarios: list[str] | None = None   # defaults to all built-in scenarios
     algorithms: list[str] | None = None  # defaults to all three algorithms
+
+
+class IncidentOptimizeRequest(BaseModel):
+    algorithm: str = "qpso"
+    seed: int | None = None
+    incident_factor: float = 0.25
 
 
 class ScenarioRequest(BaseModel):
@@ -146,6 +156,8 @@ def builtin_problems():
     problems = {"default": default_problem()}
     problems.update(create_scenarios())        # low / medium / high (team)
     problems.update(create_extra_scenarios())  # big (Ali)
+    # Real road geometry from the committed OSM extract; traffic is simulated.
+    problems["kothrud"] = create_kothrud_problem()
     return problems
 
 def problem_from_scenario_row(row):
@@ -193,6 +205,10 @@ def register_builtin_scenarios():
         "medium": "Team preset — same road, medium customer demand",
         "high": "Team preset — same road, high customer demand",
         "big": "Harder benchmark — 6 customers, 3 vehicles, capacity binds",
+        "kothrud": (
+            "Real Kothrud OSM road extract — 4 customers, 2 vehicles; "
+            "traffic speeds are simulated"
+        ),
     }
 
     for name, problem in builtin_problems().items():
@@ -315,9 +331,11 @@ def run_and_save(algo, scenario_name, problem, seed=None):
     routes = result["routes"]
     score = clean_number(result["fitness"])
 
-    # For now fitness IS the total distance. Kept as a separate field because
-    # once traffic is added, fitness will include penalties and the two differ.
-    distance = score
+    # OSM scenarios optimise simulated traffic-adjusted travel time while
+    # retaining independently measured road distance for reporting.
+    metrics = calculate_metrics(routes, problem) if routes else {}
+    distance = clean_number(metrics.get("distance"))
+    travel_time = clean_number(metrics.get("travel_time"))
 
     violations = count_violations(routes, problem)
 
@@ -333,8 +351,8 @@ def run_and_save(algo, scenario_name, problem, seed=None):
         constraint_violations=violations,
         vehicles_used=len(routes),
         seed=seed,
-        # travel_time / congestion_penalty / fuel_cost stay NULL until
-        # Zobiya's traffic model exists. We do not invent those numbers.
+        travel_time=travel_time,
+        traffic_metadata=problem.metadata,
     )
 
     return {
@@ -343,6 +361,7 @@ def run_and_save(algo, scenario_name, problem, seed=None):
         "scenario": scenario_name,
         "fitness": score,
         "distance": distance,
+        "travel_time": travel_time,
         "runtime": result["runtime"],
         "routes": routes,
         "vehicles_used": len(routes),
@@ -351,6 +370,7 @@ def run_and_save(algo, scenario_name, problem, seed=None):
         "feasible": violations == 0,
         "seed": seed,
         "convergence": [clean_number(value) for value in result["convergence"]],
+        "traffic_metadata": problem.metadata,
     }
 
 
@@ -383,6 +403,50 @@ def optimize(request: OptimizeRequest):
         problem,
         seed=request.seed,
     )
+
+
+@app.post("/optimize/kothrud-incident")
+def optimize_kothrud_incident(request: IncidentOptimizeRequest):
+    """Show a route before and after a simulated incident, then re-optimize.
+
+    The incident is placed on the first directed leg of the initial solution,
+    making its effect traceable rather than randomly choosing an unrelated edge.
+    """
+    if not 0 < request.incident_factor <= 1:
+        raise HTTPException(
+            status_code=400,
+            detail="incident_factor must satisfy 0 < factor <= 1",
+        )
+
+    before_problem = create_kothrud_problem()
+    before = run_and_save(
+        request.algorithm,
+        "kothrud",
+        before_problem,
+        seed=request.seed,
+    )
+
+    if not before["routes"] or len(before["routes"][0]) < 3:
+        raise HTTPException(status_code=422, detail="No route available for incident simulation")
+
+    first_route = before["routes"][0]
+    incident_problem = create_kothrud_problem_with_incident(
+        incident_leg=(first_route[0], first_route[1]),
+        incident_factor=request.incident_factor,
+    )
+    after = run_and_save(
+        request.algorithm,
+        "kothrud_incident",
+        incident_problem,
+        seed=request.seed,
+    )
+
+    return {
+        "before": before,
+        "after_incident": after,
+        "incident": incident_problem.metadata["incident"],
+        "note": "OSM road geometry is real; traffic and incident speed reductions are simulated.",
+    }
 
 # --------------------------------------------------
 # RESULTS
@@ -446,6 +510,10 @@ def result_detail(run_id: int):
     row = get_result(run_id)
     if row is None:
         raise HTTPException(status_code=404, detail=f"No run with id {run_id}")
+
+    # POST /optimize exposes this derived field, and the React dashboard also
+    # needs it when a user opens an older SQLite run from its history.
+    row["feasible"] = row.get("constraint_violations") == 0
 
     return row
 

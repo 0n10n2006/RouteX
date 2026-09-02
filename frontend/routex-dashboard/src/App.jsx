@@ -385,6 +385,7 @@ function DashboardView({
               ["medium", "Medium Traffic"],
               ["high", "High Traffic"],
               ["big", "Large Scenario"],
+              ["kothrud", "Kothrud OSM (simulated traffic)"],
             ]}
           />
 
@@ -411,9 +412,17 @@ function DashboardView({
         <KpiCard
           label="TOTAL DISTANCE"
           value={result?.distance ?? "—"}
-          unit={result ? "units" : ""}
+          unit={result ? (result.traffic_metadata ? "m" : "units") : ""}
           icon="↗"
           accent="blue"
+        />
+
+        <KpiCard
+          label="TRAVEL TIME"
+          value={result?.travel_time ?? "—"}
+          unit={result?.travel_time != null ? "sec" : ""}
+          icon="◷"
+          accent="purple"
         />
 
         <KpiCard
@@ -656,6 +665,7 @@ function OptimizationView({
               ["medium", "Medium Traffic"],
               ["high", "High Traffic"],
               ["big", "Large Scenario"],
+              ["kothrud", "Kothrud OSM (simulated traffic)"],
             ]}
           />
 
@@ -692,8 +702,17 @@ function OptimizationView({
             <KpiCard
               label="TOTAL DISTANCE"
               value={result.distance}
+              unit={result.traffic_metadata ? "m" : "units"}
               icon="↗"
               accent="blue"
+            />
+
+            <KpiCard
+              label="TRAVEL TIME"
+              value={result.travel_time ?? "—"}
+              unit={result.travel_time != null ? "sec" : ""}
+              icon="◷"
+              accent="purple"
             />
 
             <KpiCard
@@ -864,6 +883,7 @@ function ComparisonView({
             <option value="medium">Medium Traffic</option>
             <option value="high">High Traffic</option>
             <option value="big">Large Scenario</option>
+            <option value="kothrud">Kothrud OSM (simulated traffic)</option>
           </select>
         </div>
 
