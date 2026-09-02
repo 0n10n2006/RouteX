@@ -1,4 +1,5 @@
-from .qpso_utils import decode_random_keys, create_routes
+from .qpso_utils import decode_random_keys
+from .repair import repair_solution
 from .fitness import fitness
 from .problem import ProblemInstance
 from .constraints import validate
@@ -63,7 +64,7 @@ class QPSO:
             )
 
             # Convert customer order → vehicle routes
-            routes = create_routes(
+            routes = repair_solution(
                 customer_order,
                 problem
             )
@@ -214,7 +215,7 @@ class QPSO:
             self.global_best_position
         )
 
-        routes = create_routes(
+        routes = repair_solution(
             customer_order,
             problem
         )
