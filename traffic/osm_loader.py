@@ -22,6 +22,24 @@ TRAFFIC_FACTORS = {
 }
 
 
+CONGESTION_FACTORS = {
+    "low": 1.0,
+    "medium": 1.5,
+    "high": 2.0,
+}
+
+ROAD_CAPACITIES = {
+    "motorway": 2000,
+    "trunk": 1800,
+    "primary": 1500,
+    "secondary": 1200,
+    "tertiary": 900,
+    "residential": 600,
+    "unclassified": 600,
+    "service": 300,
+}
+
+
 def load_road_network(osm_file):
     """Load an OSM road network into a NetworkX graph."""
     osm_path = Path(osm_file)
@@ -136,3 +154,74 @@ def get_normal_factor():
 def get_peak_factor():
     """Return the traffic factor for peak conditions."""
     return get_traffic_factor("peak")
+
+
+def get_congestion_factor(congestion_level):
+    """Return the multiplier for a congestion level."""
+    if congestion_level not in CONGESTION_FACTORS:
+        raise ValueError(
+            f"Unknown congestion level: {congestion_level}"
+        )
+
+    return float(CONGESTION_FACTORS[congestion_level])
+
+
+def get_low_congestion_factor():
+    """Return the congestion factor for low congestion."""
+    return get_congestion_factor("low")
+
+
+def get_medium_congestion_factor():
+    """Return the congestion factor for medium congestion."""
+    return get_congestion_factor("medium")
+
+
+def get_high_congestion_factor():
+    """Return the congestion factor for high congestion."""
+    return get_congestion_factor("high")
+
+def get_edge_capacity(graph, source, target):
+    """Return the assumed road capacity in vehicles per hour."""
+    edge_data = graph.get_edge_data(source, target)
+
+    if edge_data is None:
+        raise ValueError(
+            f"No edge exists between {source} and {target}"
+        )
+
+    first_edge = next(iter(edge_data.values()))
+
+    highway = first_edge.get("highway", "unknown")
+
+    if isinstance(highway, list):
+        highway = highway[0]
+
+    return float(ROAD_CAPACITIES.get(highway, 500))
+
+def get_dynamic_travel_time(
+    graph,
+    source,
+    target,
+    traffic_state="normal",
+    congestion_level="low",
+):
+    """Return travel time adjusted for traffic and congestion."""
+    base_travel_time = get_edge_travel_time(
+        graph,
+        source,
+        target,
+    )
+
+    traffic_factor = get_traffic_factor(
+        traffic_state
+    )
+
+    congestion_factor = get_congestion_factor(
+        congestion_level
+    )
+
+    return (
+        base_travel_time
+        * traffic_factor
+        * congestion_factor
+    )
