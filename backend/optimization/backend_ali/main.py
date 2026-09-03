@@ -99,6 +99,7 @@ class IncidentOptimizeRequest(BaseModel):
 class ScenarioRequest(BaseModel):
     name: str
     distance_matrix: list
+    travel_time_matrix: list | None = None
     vehicles: list
     customers: list
     description: str | None = None
@@ -165,6 +166,7 @@ def problem_from_scenario_row(row):
 
     return ProblemInstance(
         distance_matrix=row["distance_matrix"],
+        travel_time_matrix=row["travel_time_matrix"],
         vehicles=row["vehicles"],
         customers=row["customers"],
     )
@@ -215,6 +217,7 @@ def register_builtin_scenarios():
         save_scenario(
             name,
             distance_matrix=problem.distance_matrix,
+            travel_time_matrix=problem.travel_time_matrix,
             vehicles=problem.vehicles,
             customers=problem.customers,
             description=descriptions.get(name),
@@ -569,7 +572,7 @@ def scenario_create(request: ScenarioRequest):
             detail="A scenario needs at least one vehicle and one customer",
         )
 
-    # The matrix must cover the depot (0) plus every customer id.
+    # Matrices must cover the depot (0) plus every customer id.
     size = len(request.distance_matrix)
     highest_id = max(customer.get("id", 0) for customer in request.customers)
     if size <= highest_id:
@@ -581,9 +584,27 @@ def scenario_create(request: ScenarioRequest):
             ),
         )
 
+    for row in request.distance_matrix:
+        if not isinstance(row, list) or len(row) != size:
+            raise HTTPException(
+                status_code=400,
+                detail="distance_matrix must be square",
+            )
+
+    if request.travel_time_matrix is not None:
+        if len(request.travel_time_matrix) != size or any(
+            not isinstance(row, list) or len(row) != size
+            for row in request.travel_time_matrix
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="travel_time_matrix must be the same square size as distance_matrix",
+            )
+
     scenario_id = save_scenario(
         name,
         distance_matrix=request.distance_matrix,
+        travel_time_matrix=request.travel_time_matrix,
         vehicles=request.vehicles,
         customers=request.customers,
         description=request.description,

@@ -71,6 +71,12 @@ RUN_COLUMNS = {
     "traffic_metadata": "TEXT",     # source, units and simulated traffic inputs
 }
 
+# Scenario columns also migrate gradually so existing local databases and
+# existing distance-only scenarios remain valid.
+SCENARIO_COLUMNS = {
+    "travel_time_matrix": "TEXT",
+}
+
 
 def create_tables():
     connection = get_connection()
@@ -109,11 +115,20 @@ def create_tables():
             num_vehicles INTEGER,
             total_demand INTEGER,
             distance_matrix TEXT,
+            travel_time_matrix TEXT,
             vehicles TEXT,
             customers TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
+    cursor.execute("PRAGMA table_info(scenarios)")
+    existing_scenario_columns = [row[1] for row in cursor.fetchall()]
+    for column, column_type in SCENARIO_COLUMNS.items():
+        if column not in existing_scenario_columns:
+            cursor.execute(
+                f"ALTER TABLE scenarios ADD COLUMN {column} {column_type}"
+            )
 
     connection.commit()
     connection.close()
@@ -220,6 +235,7 @@ def get_result(run_id):
 def save_scenario(
     name,
     distance_matrix,
+    travel_time_matrix,
     vehicles,
     customers,
     description=None,
@@ -245,6 +261,7 @@ def save_scenario(
         len(vehicles),
         total_demand,
         _dumps(distance_matrix),
+        _dumps(travel_time_matrix),
         _dumps(vehicles),
         _dumps(customers),
     )
@@ -253,16 +270,17 @@ def save_scenario(
         cursor.execute("""
             INSERT INTO scenarios (
                 name, description, source, num_customers, num_vehicles,
-                total_demand, distance_matrix, vehicles, customers
+                total_demand, distance_matrix, travel_time_matrix, vehicles, customers
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (name,) + values)
         scenario_id = cursor.lastrowid
     else:
         cursor.execute("""
             UPDATE scenarios
             SET description = ?, source = ?, num_customers = ?, num_vehicles = ?,
-                total_demand = ?, distance_matrix = ?, vehicles = ?, customers = ?
+                total_demand = ?, distance_matrix = ?, travel_time_matrix = ?,
+                vehicles = ?, customers = ?
             WHERE name = ?
         """, values + (name,))
         scenario_id = existing["id"]
@@ -276,6 +294,10 @@ def save_scenario(
 def _row_to_scenario(row):
     scenario = dict(row)
     scenario["distance_matrix"] = _loads(scenario.get("distance_matrix"), [])
+    scenario["travel_time_matrix"] = _loads(
+        scenario.get("travel_time_matrix"),
+        None,
+    )
     scenario["vehicles"] = _loads(scenario.get("vehicles"), [])
     scenario["customers"] = _loads(scenario.get("customers"), [])
     return scenario
