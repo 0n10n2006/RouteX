@@ -1,11 +1,16 @@
 import time
+import random
 
-from problem import ProblemInstance
-from greedy_vrp import greedy_vrp
-from qpso import QPSO
-from hybrid import hybrid_qpso
-from fitness import fitness
-from scenarios import create_scenarios
+random.seed(42)
+
+from .problem import ProblemInstance
+from .greedy_vrp import greedy_vrp
+from .qpso import QPSO
+from .hybrid import hybrid_qpso
+from .fitness import fitness
+from .scenarios import create_scenarios
+from .ga import GeneticAlgorithm
+from .pso import ParticleSwarmOptimization
 
 def run_greedy(problem):
     start = time.perf_counter()
@@ -30,6 +35,34 @@ def run_qpso(problem):
         qpso.step(problem, fitness, beta=0.5)
 
     result = qpso.get_best_solution(problem)
+
+    runtime = time.perf_counter() - start
+
+    return result["fitness"], runtime
+
+def run_ga(problem):
+    start = time.perf_counter()
+
+    ga = GeneticAlgorithm(
+        population_size=20,
+        generations=50
+    )
+
+    result = ga.solve(problem)
+
+    runtime = time.perf_counter() - start
+
+    return result["fitness"], runtime
+
+def run_pso(problem):
+    start = time.perf_counter()
+
+    pso = ParticleSwarmOptimization(
+        num_particles=20,
+        iterations=50
+    )
+
+    result = pso.solve(problem)
 
     runtime = time.perf_counter() - start
 
@@ -74,10 +107,14 @@ if __name__ == "__main__":
         print("================================")
 
         greedy_scores = []
+        ga_scores = []
+        pso_scores = []
         qpso_scores = []
         hybrid_scores = []
 
         greedy_times = []
+        ga_times = []
+        pso_times = []
         qpso_times = []
         hybrid_times = []
 
@@ -87,9 +124,17 @@ if __name__ == "__main__":
             greedy_scores.append(score)
             greedy_times.append(runtime)
 
+            score, runtime = run_ga(problem)
+            ga_scores.append(score)
+            ga_times.append(runtime)
+
             score, runtime = run_qpso(problem)
             qpso_scores.append(score)
             qpso_times.append(runtime)
+         
+            score, runtime = run_pso(problem)
+            pso_scores.append(score)
+            pso_times.append(runtime)
 
             score, runtime = run_hybrid(problem)
             hybrid_scores.append(score)
@@ -98,14 +143,25 @@ if __name__ == "__main__":
             print(f"Run {i + 1}/{runs} complete")
 
         greedy_avg = average(greedy_scores)
+        ga_avg = average(ga_scores)
+        pso_avg = average(pso_scores)
         qpso_avg = average(qpso_scores)
         hybrid_avg = average(hybrid_scores)
-
         print("\n===== RESULTS =====")
 
         print(
             f"Greedy: {greedy_avg:.2f} "
             f"| Runtime: {average(greedy_times):.6f}s"
+        )
+     
+        print(
+            f"GA: {ga_avg:.2f} "
+            f"| Runtime: {average(ga_times):.6f}s"
+        )
+
+        print(
+            f"PSO: {pso_avg:.2f} "
+            f"| Runtime: {average(pso_times):.6f}s"
         )
 
         print(

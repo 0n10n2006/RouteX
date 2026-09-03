@@ -1,14 +1,14 @@
 import time
 
-from qpso import QPSO
-from ga import GeneticAlgorithm # this is the new import statement for the Genetic Algorithm class
-from pso import ParticleSwarmOptimization # this is the new import statement for the Particle Swarm Optimization class
-from problem import ProblemInstance
-from greedy_vrp import greedy_vrp
-from fitness import fitness
-from constraints import validate
-from hybrid import hybrid_qpso
-from dijkstra import calculate_route_distance
+from .qpso import QPSO
+from .ga import GeneticAlgorithm
+from .pso import ParticleSwarmOptimization
+from .problem import ProblemInstance
+from .greedy_vrp import greedy_vrp
+from .fitness import fitness
+from .constraints import validate
+from .hybrid import hybrid_qpso
+from .dijkstra import calculate_route_distance
 
 def run_hybrid(problem):
 
