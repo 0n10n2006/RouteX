@@ -1,5 +1,5 @@
-from .qpso_utils import decode_random_keys, create_routes
-from .fitness import fitness
+from .qpso_utils import decode_random_keys
+from .repair import repair_solution
 from .problem import ProblemInstance
 from .constraints import validate
 
@@ -63,22 +63,27 @@ class QPSO:
             )
 
             # Convert customer order → vehicle routes
-            routes = create_routes(
+            routes = repair_solution(
                 customer_order,
                 problem
             )
+
             if routes is None:
+
                 particle.fitness = float("inf")
                 continue
 
-            # Calculate fitness
+            # Validate solution
             if not validate(routes, problem):
+
                 score = float("inf")
+
             else:
-                    score = fitness_function(
-                        routes,
-                        problem
-                    )
+
+                score = fitness_function(
+                    routes,
+                    problem
+                )
 
             particle.fitness = score
 
@@ -132,9 +137,16 @@ class QPSO:
 
         return attractor
 
-    def update_particle(self, particle, mbest, beta=0.5):
+    def update_particle(
+        self,
+        particle,
+        mbest,
+        beta=0.5
+    ):
 
-        attractor = self.calculate_attractor(particle)
+        attractor = self.calculate_attractor(
+            particle
+        )
 
         new_position = []
 
@@ -159,11 +171,15 @@ class QPSO:
             # Randomly choose direction
             if random.random() < 0.5:
 
-                new_value = attractor[i] + step
+                new_value = (
+                    attractor[i] + step
+                )
 
             else:
 
-                new_value = attractor[i] - step
+                new_value = (
+                    attractor[i] - step
+                )
 
             # Keep random key inside [0, 1]
             new_value = max(
@@ -175,7 +191,12 @@ class QPSO:
 
         particle.position = new_position
 
-    def step(self, problem, fitness_function, beta=0.5):
+    def step(
+        self,
+        problem,
+        fitness_function,
+        beta=0.5
+    ):
 
         # Evaluate current particles
         self.evaluate(
@@ -200,10 +221,10 @@ class QPSO:
             problem,
             fitness_function
         )
+
         self.convergence.append(
             self.global_best_fitness
         )
-
 
     def get_best_solution(self, problem):
 
@@ -214,7 +235,7 @@ class QPSO:
             self.global_best_position
         )
 
-        routes = create_routes(
+        routes = repair_solution(
             customer_order,
             problem
         )
@@ -224,11 +245,8 @@ class QPSO:
             "fitness": self.global_best_fitness
         }
 
-if __name__ == "__main__":
 
-    # -----------------------------
-    # Test problem
-    # -----------------------------
+if __name__ == "__main__":
 
     distance_matrix = [
         [0, 10, 15, 20, 8],
@@ -239,14 +257,11 @@ if __name__ == "__main__":
     ]
 
     problem = ProblemInstance(
-
         distance_matrix=distance_matrix,
-
         vehicles=[
             {"id": 1, "capacity": 10},
             {"id": 2, "capacity": 10}
         ],
-
         customers=[
             {"id": 1, "demand": 2},
             {"id": 2, "demand": 3},
@@ -255,18 +270,10 @@ if __name__ == "__main__":
         ]
     )
 
-    # -----------------------------
-    # Create QPSO
-    # -----------------------------
-
     qpso = QPSO(
         num_particles=5,
         num_customers=4
     )
-
-    # -----------------------------
-    # Run QPSO
-    # -----------------------------
 
     print("QPSO convergence:\n")
 
@@ -274,7 +281,17 @@ if __name__ == "__main__":
 
         qpso.step(
             problem,
-            fitness,
+            lambda solution, problem: sum(
+                sum(
+                    problem.distance_matrix[
+                        route[i]
+                    ][
+                        route[i + 1]
+                    ]
+                    for i in range(len(route) - 1)
+                )
+                for route in solution
+            ),
             beta=0.5
         )
 
@@ -282,10 +299,6 @@ if __name__ == "__main__":
             f"Iteration {iteration + 1}: "
             f"{qpso.global_best_fitness}"
         )
-
-    # -----------------------------
-    # Final results
-    # -----------------------------
 
     print("\nFinal global best:")
     print(qpso.global_best_fitness)

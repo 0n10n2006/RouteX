@@ -1,66 +1,124 @@
-try:
-    # When imported as part of the backend package (e.g. by the FastAPI app)
-    from .local_search import two_opt
-    from .qpso import QPSO
-    from .fitness import fitness
-    from .constraints import validate
-except ImportError:
-    # When run directly from inside the optimization/ folder: python hybrid.py
-    from local_search import two_opt
-    from qpso import QPSO
-    from fitness import fitness
-    from constraints import validate
+from .local_search import two_opt
+from .qpso import QPSO
+from .fitness import fitness
+from .constraints import validate
 
 
-def hybrid_qpso(problem, num_particles=10, iterations=20, beta=0.5):
+def hybrid_qpso(
+    problem,
+    num_particles=10,
+    iterations=20,
+    beta=0.5
+):
+    """
+    Adaptive Hybrid QPSO + 2-opt.
 
-    # Step 1: Run QPSO
+    QPSO performs the global search.
+    2-opt is triggered whenever QPSO discovers
+    a new global best solution.
+
+    The locally improved solution is kept externally
+    as the best hybrid solution, but is NOT injected
+    back into the QPSO swarm.
+
+    This architecture was selected after Week 4
+    ablation experiments showed that feedback injection
+    consistently underperformed plain QPSO + 2-opt.
+    """
+
     qpso = QPSO(
         num_particles=num_particles,
         num_customers=len(problem.customers)
     )
 
+    best_routes = None
+    best_score = float("inf")
+
+    previous_qpso_best = float("inf")
+
+    local_search_count = 0
+
     for _ in range(iterations):
+
+        # Run one QPSO iteration.
         qpso.step(
             problem,
             fitness,
             beta=beta
         )
 
-    # Get QPSO's best solution
-    qpso_result = qpso.get_best_solution(problem)
+        current_qpso_best = qpso.global_best_fitness
 
-    if qpso_result is None:
-        return None
+        # Apply local search only when QPSO
+        # discovers a new global best.
+        if current_qpso_best < previous_qpso_best:
 
-    # Step 2: Improve QPSO solution using 2-opt
-    improved_routes, improved_score = two_opt(
-        qpso_result["routes"],
-        problem,
-        fitness
-    )
+            qpso_result = qpso.get_best_solution(problem)
 
-    # Make sure the final solution is valid
-    if not validate(improved_routes, problem):
-        return {
-            "algorithm": "Hybrid QPSO + 2-opt",
-            "routes": qpso_result["routes"],
-            "fitness": qpso_result["fitness"],
-            # Convergence of the QPSO phase (added so the API can chart it).
-            "convergence": qpso.convergence
-        }
+            if qpso_result is not None:
+
+                candidate_routes = qpso_result["routes"]
+                candidate_score = qpso_result["fitness"]
+
+                improved_routes, improved_score = two_opt(
+                    candidate_routes,
+                    problem,
+                    fitness
+                )
+
+                local_search_count += 1
+
+                # Never allow 2-opt to worsen the solution.
+                if improved_score > candidate_score:
+                    improved_routes = candidate_routes
+                    improved_score = candidate_score
+
+                # Keep the best hybrid solution found so far.
+                if improved_score < best_score:
+
+                    best_routes = [
+                        route[:]
+                        for route in improved_routes
+                    ]
+
+                    best_score = improved_score
+
+            previous_qpso_best = current_qpso_best
+
+    # Fallback if no QPSO solution was recorded.
+    if best_routes is None:
+
+        qpso_result = qpso.get_best_solution(problem)
+
+        if qpso_result is None:
+            return None
+
+        best_routes = qpso_result["routes"]
+        best_score = qpso_result["fitness"]
+
+    # Final safety check.
+    if not validate(best_routes, problem):
+
+        qpso_result = qpso.get_best_solution(problem)
+
+        if qpso_result is None:
+            return None
+
+        best_routes = qpso_result["routes"]
+        best_score = qpso_result["fitness"]
 
     return {
-        "algorithm": "Hybrid QPSO + 2-opt",
-        "routes": improved_routes,
-        "fitness": improved_score,
-        # Convergence of the QPSO phase (added so the API can chart it).
-        "convergence": qpso.convergence
+        "algorithm": "Adaptive Hybrid QPSO + 2-opt",
+        "routes": best_routes,
+        "fitness": best_score,
+        "convergence": qpso.convergence,
+        "local_search_count": local_search_count
     }
+
 
 if __name__ == "__main__":
 
-    from problem import ProblemInstance
+    from .problem import ProblemInstance
 
     distance_matrix = [
         [0, 10, 15, 20, 8],
@@ -72,12 +130,10 @@ if __name__ == "__main__":
 
     problem = ProblemInstance(
         distance_matrix=distance_matrix,
-
         vehicles=[
             {"id": 1, "capacity": 10},
             {"id": 2, "capacity": 10}
         ],
-
         customers=[
             {"id": 1, "demand": 2},
             {"id": 2, "demand": 3},
@@ -86,9 +142,14 @@ if __name__ == "__main__":
         ]
     )
 
-    result = hybrid_qpso(problem)
+    result = hybrid_qpso(
+        problem,
+        num_particles=5,
+        iterations=20,
+        beta=0.5
+    )
 
-    print("\nHybrid Result")
-    print("-------------")
-    print("Routes:", result["routes"])
+    print("\n## Adaptive Hybrid QPSO + 2-opt Result")
+    print("\nRoutes:", result["routes"])
     print("Fitness:", result["fitness"])
+    print("Local search triggers:", result["local_search_count"])

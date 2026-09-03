@@ -9,12 +9,13 @@ optimizer directly. JSON requests use the header `Content-Type: application/json
 
 ## Current data status
 
-- The currently returned distances and routes use hand-written **test matrices**.
-- `travel_time`, `congestion_penalty`, and `fuel_cost` are deliberately `null`.
-  Do not show a fake value, zero, or calculated estimate for them. They become
-  available only after the traffic graph and incident model are integrated.
-- `fitness` is currently the same as `distance`. That will change when traffic
-  penalties are part of the fitness function.
+- The `kothrud` scenario uses real road geometry from the committed Kothrud OSM
+  extract. Its traffic factors and incidents are **simulated**, not live data.
+- `kothrud` returns road distance in metres and simulated travel time in seconds.
+  Matrix-only scenarios retain their original test-distance objective and return
+  `travel_time: null`.
+- For `kothrud`, `fitness` is simulated traffic-adjusted travel time. For all
+  other current scenarios, it remains distance.
 - A JSON `null` means the value is unavailable or the optimizer did not find a
   JSON-safe finite value.
 
@@ -70,8 +71,8 @@ Field meanings:
 | --- | --- |
 | `id` | Persistent SQLite run ID. |
 | `algorithm` | Display name: `QPSO`, `Hybrid QPSO + 2-opt`, or `Greedy (classical baseline)`. |
-| `fitness` | Score to minimise; currently equals `distance`. |
-| `distance` | Total test-matrix route distance. |
+| `fitness` | Score to minimise: simulated travel time for `kothrud`, otherwise distance. |
+| `distance` | Total road distance in metres for `kothrud`; test-matrix units otherwise. |
 | `runtime` | Optimizer execution time in seconds. |
 | `scenario` | Resolved scenario name. An unknown requested name resolves safely to `default`. |
 | `routes` | One route list for each used vehicle. |
@@ -80,7 +81,8 @@ Field meanings:
 | `constraint_violations` | Count of failed route checks. `0` means feasible. |
 | `vehicles_used` | Number of returned route lists. |
 | `seed` | Optional reproducibility seed; `null` when not supplied. |
-| `travel_time`, `congestion_penalty`, `fuel_cost` | **Traffic-model placeholders: always `null` for now.** |
+| `travel_time` | Simulated traffic-adjusted seconds for `kothrud`; `null` for matrix-only scenarios. |
+| `traffic_metadata` | OSM/traffic provenance, location coordinates, and any incident details. |
 
 ## Endpoints
 
@@ -94,7 +96,7 @@ Response:
 {
   "message": "RouteX Backend is running!",
   "algorithms": ["greedy", "qpso", "hybrid"],
-  "scenarios": ["default", "low", "medium", "high", "big"]
+  "scenarios": ["default", "low", "medium", "high", "big", "kothrud"]
 }
 ```
 
@@ -147,6 +149,20 @@ Response:
 ```json
 {"results": [/* optimization-run objects */]}
 ```
+
+### `POST /optimize/kothrud-incident`
+
+Runs Kothrud optimization, slows an OSM edge on the initial route, then
+re-optimizes. Both runs are saved and returned. OSM geometry is real; the
+speed reduction is simulated.
+
+```json
+{"algorithm": "hybrid", "seed": 42, "incident_factor": 0.25}
+```
+
+`incident_factor` must be greater than `0` and at most `1`; lower values mean a
+slower affected road. The response contains `before`, `after_incident`, and
+the selected OSM `incident` edge.
 
 ### `GET /results/comparison`
 

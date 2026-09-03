@@ -1,0 +1,9 @@
+# RouteX backend and traffic-graph runtime dependencies.
+# Install with: python -m pip install -r requirements.txt
+
+fastapi==0.141.1
+uvicorn==0.52.4
+networkx==3.6.1
+osmnx==2.1.1
+# Required by OSMnx to find nearest road nodes on unprojected OSM graphs.
+scikit-learn==1.9.0

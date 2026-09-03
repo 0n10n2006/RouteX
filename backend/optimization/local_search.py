@@ -53,3 +53,64 @@ def two_opt(solution, problem, fitness_function):
                         improved = True
 
     return best_solution, best_score
+
+def two_opt_first_improvement(solution, problem, fitness_function):
+    """
+    First-improvement 2-opt.
+
+    Accepts the first improving 2-opt move found rather than
+    exhaustively searching the entire neighborhood for the best move.
+    """
+
+    best_solution = [route[:] for route in solution]
+
+    best_score = fitness_function(
+        best_solution,
+        problem
+    )
+
+    improved = True
+
+    while improved:
+        improved = False
+
+        for route_index in range(len(best_solution)):
+
+            route = best_solution[route_index]
+
+            for i in range(1, len(route) - 2):
+
+                for j in range(i + 1, len(route) - 1):
+
+                    candidate_solution = [
+                        r[:] for r in best_solution
+                    ]
+
+                    candidate_route = candidate_solution[route_index]
+
+                    candidate_route[i:j + 1] = reversed(
+                        candidate_route[i:j + 1]
+                    )
+
+                    candidate_score = fitness_function(
+                        candidate_solution,
+                        problem
+                    )
+
+                    if candidate_score < best_score:
+
+                        best_solution = candidate_solution
+                        best_score = candidate_score
+
+                        improved = True
+
+                        # Immediately accept the first improvement.
+                        break
+
+                if improved:
+                    break
+
+            if improved:
+                break
+
+    return best_solution, best_score
