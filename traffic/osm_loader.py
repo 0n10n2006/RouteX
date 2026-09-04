@@ -225,3 +225,17 @@ def get_dynamic_travel_time(
         * traffic_factor
         * congestion_factor
     )
+
+def get_node_coordinates(graph, node_id):
+    """Return the latitude and longitude of a graph node."""
+    if node_id not in graph.nodes:
+        raise ValueError(
+            f"Node {node_id} does not exist in the graph"
+        )
+
+    node_data = graph.nodes[node_id]
+
+    return {
+        "latitude": float(node_data["y"]),
+        "longitude": float(node_data["x"]),
+    }

@@ -18,6 +18,7 @@ from traffic.osm_loader import (
     get_high_congestion_factor,
     get_edge_capacity,
     get_dynamic_travel_time,
+    get_node_coordinates,
 )
 
 
@@ -659,3 +660,34 @@ def test_dynamic_travel_time_calculation():
     print("Expected travel time:", expected_time)
 
     assert dynamic_time == expected_time
+
+def test_get_node_coordinates():
+    graph = load_road_network(
+        "data/raw/kothrud_test_area.osm"
+    )
+
+    graph = prepare_graph(graph)
+
+    node_id = list(graph.nodes)[0]
+
+    coordinates = get_node_coordinates(
+        graph,
+        node_id,
+    )
+
+    print("Node ID:", node_id)
+    print("Coordinates:", coordinates)
+
+    assert isinstance(coordinates, dict)
+    assert "latitude" in coordinates
+    assert "longitude" in coordinates
+
+    assert isinstance(
+        coordinates["latitude"],
+        float,
+    )
+
+    assert isinstance(
+        coordinates["longitude"],
+        float,
+    )
