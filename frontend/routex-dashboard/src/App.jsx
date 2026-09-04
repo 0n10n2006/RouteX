@@ -165,13 +165,13 @@ function App() {
       {/* SIDEBAR */}
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">RX</div>
-
-          <div className="brand-text">
-            <strong>RouteX</strong>
-            <span>TRAFFIC OPTIMIZER</span>
-          </div>
-        </div>
+          <div className="brand-logo-container">
+           <img
+              src="/routex-logo.png"
+              alt="RouteX"
+              className="brand-logo"/>
+  </div>
+</div>
 
         <div className="sidebar-section-label">NAVIGATION</div>
 

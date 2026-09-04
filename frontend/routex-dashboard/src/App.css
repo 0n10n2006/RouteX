@@ -107,63 +107,32 @@ button:disabled {
 
 
 /* =========================================================
-   BRAND
+   ROUTEX BRAND
 ========================================================= */
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
-
-  padding: 8px 8px 25px;
+  height: 64px;
+  padding: 0 8px;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
-.brand-mark {
-  width: 42px;
-  height: 42px;
-
+.brand-logo-container {
+  width: 185px;
+  height: 52px;
   display: flex;
   align-items: center;
-  justify-content: center;
-
-  border-radius: 12px;
-
-  background:
-    linear-gradient(
-      135deg,
-      #18b9e8,
-      #4c6fff
-    );
-
-  color: #07101f;
-
-  font-weight: 900;
-  font-size: 15px;
-
-  box-shadow:
-    0 8px 25px
-    rgba(24, 185, 232, 0.25);
+  overflow: hidden;
 }
 
-.brand-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.brand-text strong {
-  font-size: 19px;
-  color: #f5f9ff;
-  letter-spacing: -0.4px;
-}
-
-.brand-text span {
-  font-size: 9px;
-
-  color: #7182a5;
-
-  letter-spacing: 1.2px;
-  font-weight: 700;
+.brand-logo {
+  width: 175px;
+  height: auto;
+  max-height: 52px;
+  object-fit: contain;
+  display: block;
 }
 
 
@@ -1615,108 +1584,292 @@ button:disabled {
 /* =========================================================
    HISTORY VIEW
 ========================================================= */
+/* =========================================================
+   RUN HISTORY TABLE
+========================================================= */
 
 .history-panel {
-  padding: 10px 20px;
+  padding: 0;
+  overflow: hidden;
 }
 
+/* SAME GRID FOR HEADER AND ALL ROWS */
 .history-table-header,
 .history-table-row {
-  width: 100%;
-
   display: grid;
 
   grid-template-columns:
     0.8fr
-    1.3fr
-    1fr
+    2.4fr
+    1.2fr
     1fr
     1.2fr
-    40px;
+    60px;
 
   align-items: center;
 
-  gap: 15px;
+  width: 100%;
+
+  padding: 0 38px;
+
+  column-gap: 24px;
 }
+
+
+/* =========================================================
+   TABLE HEADER
+========================================================= */
 
 .history-table-header {
-  padding: 13px 10px;
+  min-height: 64px;
 
-  color: #61749a;
+  border-bottom: 1px solid #29365f;
 
-  font-size: 9px;
-  font-weight: 800;
+  color: #7f91b2;
 
-  letter-spacing: 1px;
+  font-size: 11px;
+  font-weight: 700;
+
+  letter-spacing: 1.4px;
+
+  text-transform: uppercase;
 }
 
+
+/* =========================================================
+   TABLE ROW
+========================================================= */
+
 .history-table-row {
-  padding: 15px 10px;
+  min-height: 84px;
+
+  padding-top: 0;
+  padding-bottom: 0;
+
+  border: none;
+  border-bottom: 1px solid #29365f;
 
   background: transparent;
 
-  border-top: 1px solid #1c2b49;
+  color: #dce5f5;
 
-  color: #aebfda;
+  font-family: inherit;
+  font-size: 15px;
 
   text-align: left;
 
   cursor: pointer;
 
   transition:
-    background 0.18s ease,
-    transform 0.18s ease;
+    background 0.2s ease,
+    border-color 0.2s ease;
 }
+
+
+/* Remove default button appearance */
+
+.history-table-row {
+  appearance: none;
+
+  width: 100%;
+
+  outline: none;
+}
+
+
+/* Hover */
 
 .history-table-row:hover {
-  background:
-    rgba(24, 185, 232, 0.035);
+  background: rgba(66, 217, 255, 0.045);
 }
 
-.history-table-row strong {
-  color: #e8f1ff;
 
-  font-size: 12px;
+.history-table-row:last-child {
+  border-bottom: none;
 }
+
+
+/* =========================================================
+   COLUMN ALIGNMENT
+========================================================= */
+
+/* RUN */
+
+.history-table-header > :nth-child(1),
+.history-table-row > :nth-child(1) {
+  justify-self: start;
+}
+
+
+/* ALGORITHM */
+
+.history-table-header > :nth-child(2),
+.history-table-row > :nth-child(2) {
+  justify-self: start;
+}
+
+
+/* SCENARIO */
+
+.history-table-header > :nth-child(3),
+.history-table-row > :nth-child(3) {
+  justify-self: start;
+}
+
+
+/* FITNESS */
+
+.history-table-header > :nth-child(4),
+.history-table-row > :nth-child(4) {
+  justify-self: start;
+}
+
+
+/* RUNTIME */
+
+.history-table-header > :nth-child(5),
+.history-table-row > :nth-child(5) {
+  justify-self: start;
+}
+
+
+/* ARROW */
+
+.history-table-header > :nth-child(6),
+.history-table-row > :nth-child(6) {
+  justify-self: end;
+}
+
+
+/* =========================================================
+   RUN NUMBER
+========================================================= */
 
 .run-number {
-  color: #42d9ff;
+  color: #62d9ff;
 
   font-family:
-    "SFMono-Regular",
     Consolas,
+    "Courier New",
     monospace;
 
-  font-size: 12px;
   font-weight: 700;
+
+  white-space: nowrap;
 }
+
+
+/* =========================================================
+   ALGORITHM
+========================================================= */
+
+.history-table-row strong {
+  color: #e3eaf7;
+
+  font-weight: 700;
+
+  white-space: nowrap;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+}
+
+
+/* =========================================================
+   SCENARIO TAG
+========================================================= */
 
 .scenario-tag {
   display: inline-flex;
-  justify-content: center;
+
+  align-items: center;
 
   width: fit-content;
 
-  padding: 5px 9px;
+  padding: 9px 14px;
 
   border-radius: 999px;
 
-  background: #15233d;
+  background: #1a2944;
 
-  color: #91a5c6;
+  color: #aebbd8;
 
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
+
+  text-transform: capitalize;
+
+  white-space: nowrap;
 }
+
+
+/* =========================================================
+   RUNTIME
+========================================================= */
+
+.history-table-row > :nth-child(5) {
+  color: #c4cedf;
+
+  white-space: nowrap;
+}
+
+
+/* =========================================================
+   VIEW ARROW
+========================================================= */
 
 .view-arrow {
-  color: #42d9ff;
+  justify-self: end;
 
-  font-size: 17px;
+  color: #62d9ff;
 
-  text-align: right;
+  font-size: 25px;
+
+  line-height: 1;
+
+  font-weight: 400;
 }
 
+
+/* =========================================================
+   RESPONSIVE
+========================================================= */
+
+@media (max-width: 1100px) {
+
+  .history-table-header,
+  .history-table-row {
+
+    grid-template-columns:
+      0.7fr
+      2fr
+      1fr
+      0.8fr
+      1fr
+      40px;
+
+    column-gap: 16px;
+
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+}
+
+
+@media (max-width: 800px) {
+
+  .history-panel {
+    overflow-x: auto;
+  }
+
+  .history-table-header,
+  .history-table-row {
+    min-width: 750px;
+  }
+
+}
 
 /* =========================================================
    COMPACT HISTORY
