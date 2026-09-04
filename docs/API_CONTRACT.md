@@ -153,16 +153,26 @@ Response:
 ### `POST /optimize/kothrud-incident`
 
 Runs Kothrud optimization, slows an OSM edge on the initial route, then
-re-optimizes. Both runs are saved and returned. OSM geometry is real; the
-speed reduction is simulated.
+re-optimizes. Both runs use the same requested seed, are saved, and returned.
+OSM geometry is real; the speed reduction is simulated. Choose either a named
+incident scenario or one exact directed OSM edge; do not send both.
 
 ```json
-{"algorithm": "hybrid", "seed": 42, "incident_factor": 0.25}
+{
+  "algorithm": "hybrid",
+  "seed": 42,
+  "incident_scenario": "kothrud_alternative_corridor_slowdown",
+  "incident_factor": 0.10
+}
 ```
 
 `incident_factor` must be greater than `0` and at most `1`; lower values mean a
-slower affected road. The response contains `before`, `after_incident`, and
-the selected OSM `incident` edge.
+slower affected road. The recommended named scenario is
+`kothrud_alternative_corridor_slowdown`, verified in Week 5 against a Kothrud
+alternative corridor. Use `incident_factor: 0.10` to reproduce that experiment.
+`kothrud_connector_slowdown` remains as a compatibility alias. To choose an
+exact edge instead, send `"incident_edge": [4704828557, 4704828553, 0]`. The response contains
+`before`, `after_incident`, `incident`, and `traffic_metadata`.
 
 ### `GET /results/comparison`
 
@@ -213,6 +223,15 @@ Returns only chart data for one saved run.
 
 For greedy, `convergence` is `[]` and `iterations` is `0`; show no line chart.
 Missing IDs return the same `404` shape as `GET /results/{run_id}`.
+
+### `GET /results/{run_id}/geometry`
+
+Returns road-following route geometry for a saved **Kothrud OSM** run as a
+GeoJSON FeatureCollection. Each feature represents one vehicle route; each
+coordinate is `[longitude, latitude]`. The response also includes the depot /
+customer `locations` and any simulated `incident` metadata.
+
+Matrix-only scenarios return `422` because the API will not invent map lines.
 
 ### `GET /scenarios`
 

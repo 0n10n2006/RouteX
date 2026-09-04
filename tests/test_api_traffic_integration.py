@@ -31,11 +31,40 @@ def test_kothrud_api_saves_traffic_metrics_and_reoptimizes(tmp_path):
     assert body["before"]["travel_time"] is not None
     assert body["after_incident"]["scenario"] == "kothrud_incident"
     assert body["after_incident"]["travel_time"] is not None
-    assert body["incident"]["leg"] == body["before"]["routes"][0][:2]
+    assert body["incident"]["scenario"] == "kothrud_alternative_corridor_slowdown"
+    assert body["traffic_metadata"]["after_incident"]["incident"] == body["incident"]
 
     saved = client.get(f"/results/{body['after_incident']['run_id']}")
     assert saved.status_code == 200
     assert saved.json()["travel_time"] == body["after_incident"]["travel_time"]
+
+    geometry = client.get(f"/results/{body['after_incident']['run_id']}/geometry")
+    assert geometry.status_code == 200
+    assert geometry.json()["type"] == "FeatureCollection"
+    assert len(geometry.json()["features"]) == body["after_incident"]["vehicles_used"]
+    assert geometry.json()["features"][0]["geometry"]["type"] == "LineString"
+
+
+def test_kothrud_incident_accepts_a_specific_osm_edge(tmp_path):
+    database.DATABASE = tmp_path / "specific-edge-test.db"
+    database.create_tables()
+
+    from backend.optimization.backend_ali.main import app
+
+    response = TestClient(app).post(
+        "/optimize/kothrud-incident",
+        json={
+            "algorithm": "greedy",
+            "seed": 77,
+            "incident_edge": [1563310394, 4704828557, 0],
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["incident"]["scenario"] == "custom_osm_edge"
+    assert body["incident"]["edge"] == [1563310394, 4704828557, 0]
+    assert body["before"]["seed"] == body["after_incident"]["seed"] == 77
 
 
 def test_custom_scenario_accepts_and_uses_travel_time_matrix(tmp_path):
