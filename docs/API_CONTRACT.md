@@ -153,16 +153,24 @@ Response:
 ### `POST /optimize/kothrud-incident`
 
 Runs Kothrud optimization, slows an OSM edge on the initial route, then
-re-optimizes. Both runs are saved and returned. OSM geometry is real; the
-speed reduction is simulated.
+re-optimizes. Both runs use the same requested seed, are saved, and returned.
+OSM geometry is real; the speed reduction is simulated. Choose either a named
+incident scenario or one exact directed OSM edge; do not send both.
 
 ```json
-{"algorithm": "hybrid", "seed": 42, "incident_factor": 0.25}
+{
+  "algorithm": "hybrid",
+  "seed": 42,
+  "incident_scenario": "kothrud_connector_slowdown",
+  "incident_factor": 0.25
+}
 ```
 
 `incident_factor` must be greater than `0` and at most `1`; lower values mean a
-slower affected road. The response contains `before`, `after_incident`, and
-the selected OSM `incident` edge.
+slower affected road. The current named scenario is
+`kothrud_connector_slowdown`. To choose an exact edge instead, send
+`"incident_edge": [1563310394, 4704828557, 0]`. The response contains
+`before`, `after_incident`, `incident`, and `traffic_metadata`.
 
 ### `GET /results/comparison`
 

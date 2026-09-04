@@ -27,6 +27,47 @@ KOTHRUD_TRAFFIC_FACTORS = {
     "default": 0.75,
 }
 
+# Stable, known OSM edges from the committed Kothrud extract. These names make
+# repeated before/after experiments reproducible and easy to discuss in demos.
+DEFAULT_KOTHRUD_INCIDENT_SCENARIO = "kothrud_connector_slowdown"
+KOTHRUD_INCIDENT_SCENARIOS = {
+    "kothrud_connector_slowdown": {
+        "edge": (1563310394, 4704828557, 0),
+        "description": "Simulated slowdown on the Kothrud connector road",
+    },
+}
+
+
+def resolve_kothrud_incident(incident_edge=None, incident_scenario=None):
+    """Resolve an explicit OSM edge or a stable named incident scenario."""
+    if incident_edge is not None and incident_scenario is not None:
+        raise ValueError("Provide either incident_edge or incident_scenario, not both")
+
+    if incident_edge is not None:
+        if (
+            not isinstance(incident_edge, (list, tuple))
+            or len(incident_edge) != 3
+            or any(not isinstance(value, int) or isinstance(value, bool) for value in incident_edge)
+        ):
+            raise ValueError("incident_edge must be [u, v, key] using integer OSM IDs")
+        return {
+            "scenario": "custom_osm_edge",
+            "edge": tuple(incident_edge),
+            "description": "Simulated slowdown on a user-selected OSM edge",
+        }
+
+    name = (incident_scenario or DEFAULT_KOTHRUD_INCIDENT_SCENARIO).lower().strip()
+    definition = KOTHRUD_INCIDENT_SCENARIOS.get(name)
+    if definition is None:
+        available = ", ".join(sorted(KOTHRUD_INCIDENT_SCENARIOS))
+        raise ValueError(f"Unknown incident_scenario '{name}'. Available: {available}")
+
+    return {
+        "scenario": name,
+        "edge": definition["edge"],
+        "description": definition["description"],
+    }
+
 
 def _connected_locations(graph, count=5):
     """Select deterministic, geographically spread nodes in one SCC.
@@ -69,55 +110,12 @@ def _connected_locations(graph, count=5):
 
 def create_kothrud_problem():
     """Create the built-in real-road / simulated-traffic demo problem."""
-    return create_kothrud_problem_with_incident()
-
-
-def create_kothrud_problem_with_incident(incident_leg=None, incident_factor=None):
-    """Create Kothrud data, optionally slowing one edge of a route leg.
-
-    ``incident_leg`` contains two RouteX location IDs, for example ``(0, 2)``.
-    The selected OSM edge is on that exact directed road path, so the incident
-    genuinely affects the route that triggered re-optimization.
-    """
     graph = prepare_graph(load_road_network(KOTHRUD_OSM_FILE))
+    return _create_kothrud_problem(graph)
+
+
+def _create_kothrud_problem(graph, incident_edges=None, incident_metadata=None):
     locations = _connected_locations(graph)
-
-    incident_edges = None
-    incident_metadata = None
-    if incident_leg is not None:
-        if incident_factor is None:
-            incident_factor = 0.25
-        if not 0 < float(incident_factor) <= 1:
-            raise ValueError("incident_factor must satisfy 0 < factor <= 1")
-
-        source_id, target_id = incident_leg
-        if not 0 <= source_id < len(locations) or not 0 <= target_id < len(locations):
-            raise ValueError("incident leg contains an unknown location id")
-
-        source = next(
-            node for node, data in graph.nodes(data=True)
-            if data["y"] == locations[source_id]["latitude"]
-            and data["x"] == locations[source_id]["longitude"]
-        )
-        target = next(
-            node for node, data in graph.nodes(data=True)
-            if data["y"] == locations[target_id]["latitude"]
-            and data["x"] == locations[target_id]["longitude"]
-        )
-        path = nx.shortest_path(graph, source, target, weight="length")
-        if len(path) < 2:
-            raise ValueError("incident leg has no road edge")
-
-        edge_data = graph.get_edge_data(path[0], path[1])
-        edge_key = min(edge_data, key=lambda key: edge_data[key].get("length", 0))
-        affected_edge = (path[0], path[1], edge_key)
-        incident_edges = {affected_edge: float(incident_factor)}
-        incident_metadata = {
-            "type": "simulated road-speed incident",
-            "leg": [source_id, target_id],
-            "edge": list(affected_edge),
-            "speed_factor": float(incident_factor),
-        }
 
     matrix_data = build_route_matrix(
         graph,
@@ -148,3 +146,32 @@ def create_kothrud_problem_with_incident(incident_leg=None, incident_factor=None
         },
     )
     return problem
+
+
+def create_kothrud_problem_with_incident(
+    incident_edge,
+    incident_factor=0.25,
+    incident_scenario="custom_osm_edge",
+    incident_description=None,
+):
+    """Create Kothrud data with a slowdown on one exact directed OSM edge."""
+    if not 0 < float(incident_factor) <= 1:
+        raise ValueError("incident_factor must satisfy 0 < factor <= 1")
+
+    graph = prepare_graph(load_road_network(KOTHRUD_OSM_FILE))
+    affected_edge = tuple(incident_edge)
+    if not graph.has_edge(*affected_edge):
+        raise ValueError(f"Incident edge does not exist in Kothrud graph: {affected_edge}")
+
+    incident_metadata = {
+        "type": "simulated road-speed incident",
+        "scenario": incident_scenario,
+        "description": incident_description,
+        "edge": list(affected_edge),
+        "speed_factor": float(incident_factor),
+    }
+    return _create_kothrud_problem(
+        graph,
+        incident_edges={affected_edge: float(incident_factor)},
+        incident_metadata=incident_metadata,
+    )

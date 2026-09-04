@@ -30,6 +30,7 @@ from ..constraints import check_customer_visits, check_depot, check_capacity
 from ..traffic_scenarios import (
     create_kothrud_problem,
     create_kothrud_problem_with_incident,
+    resolve_kothrud_incident,
 )
 
 from .database import (
@@ -94,6 +95,8 @@ class IncidentOptimizeRequest(BaseModel):
     algorithm: str = "qpso"
     seed: int | None = None
     incident_factor: float = 0.25
+    incident_edge: list[int] | None = None
+    incident_scenario: str | None = None
 
 
 class ScenarioRequest(BaseModel):
@@ -412,8 +415,8 @@ def optimize(request: OptimizeRequest):
 def optimize_kothrud_incident(request: IncidentOptimizeRequest):
     """Show a route before and after a simulated incident, then re-optimize.
 
-    The incident is placed on the first directed leg of the initial solution,
-    making its effect traceable rather than randomly choosing an unrelated edge.
+    The incident is an explicit OSM edge or a stable named scenario. The same
+    requested seed is passed to both runs for a reproducible comparison.
     """
     if not 0 < request.incident_factor <= 1:
         raise HTTPException(
@@ -429,14 +432,19 @@ def optimize_kothrud_incident(request: IncidentOptimizeRequest):
         seed=request.seed,
     )
 
-    if not before["routes"] or len(before["routes"][0]) < 3:
-        raise HTTPException(status_code=422, detail="No route available for incident simulation")
-
-    first_route = before["routes"][0]
-    incident_problem = create_kothrud_problem_with_incident(
-        incident_leg=(first_route[0], first_route[1]),
-        incident_factor=request.incident_factor,
-    )
+    try:
+        selection = resolve_kothrud_incident(
+            incident_edge=request.incident_edge,
+            incident_scenario=request.incident_scenario,
+        )
+        incident_problem = create_kothrud_problem_with_incident(
+            incident_edge=selection["edge"],
+            incident_factor=request.incident_factor,
+            incident_scenario=selection["scenario"],
+            incident_description=selection["description"],
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
     after = run_and_save(
         request.algorithm,
         "kothrud_incident",
@@ -448,6 +456,10 @@ def optimize_kothrud_incident(request: IncidentOptimizeRequest):
         "before": before,
         "after_incident": after,
         "incident": incident_problem.metadata["incident"],
+        "traffic_metadata": {
+            "before": before_problem.metadata,
+            "after_incident": incident_problem.metadata,
+        },
         "note": "OSM road geometry is real; traffic and incident speed reductions are simulated.",
     }
 
