@@ -161,15 +161,17 @@ incident scenario or one exact directed OSM edge; do not send both.
 {
   "algorithm": "hybrid",
   "seed": 42,
-  "incident_scenario": "kothrud_connector_slowdown",
-  "incident_factor": 0.25
+  "incident_scenario": "kothrud_alternative_corridor_slowdown",
+  "incident_factor": 0.10
 }
 ```
 
 `incident_factor` must be greater than `0` and at most `1`; lower values mean a
-slower affected road. The current named scenario is
-`kothrud_connector_slowdown`. To choose an exact edge instead, send
-`"incident_edge": [1563310394, 4704828557, 0]`. The response contains
+slower affected road. The recommended named scenario is
+`kothrud_alternative_corridor_slowdown`, verified in Week 5 against a Kothrud
+alternative corridor. Use `incident_factor: 0.10` to reproduce that experiment.
+`kothrud_connector_slowdown` remains as a compatibility alias. To choose an
+exact edge instead, send `"incident_edge": [4704828557, 4704828553, 0]`. The response contains
 `before`, `after_incident`, `incident`, and `traffic_metadata`.
 
 ### `GET /results/comparison`

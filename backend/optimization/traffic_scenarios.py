@@ -29,11 +29,18 @@ KOTHRUD_TRAFFIC_FACTORS = {
 
 # Stable, known OSM edges from the committed Kothrud extract. These names make
 # repeated before/after experiments reproducible and easy to discuss in demos.
-DEFAULT_KOTHRUD_INCIDENT_SCENARIO = "kothrud_connector_slowdown"
+DEFAULT_KOTHRUD_INCIDENT_SCENARIO = "kothrud_alternative_corridor_slowdown"
 KOTHRUD_INCIDENT_SCENARIOS = {
+    # Verified by Naumaan's Week 5 experiment: this edge sits on one of two
+    # 0 -> 1 corridors, so slowing it creates a repeatable rerouting case.
+    "kothrud_alternative_corridor_slowdown": {
+        "edge": (4704828557, 4704828553, 0),
+        "description": "Simulated slowdown on a Kothrud alternative corridor",
+    },
+    # Backwards-compatible name used by earlier API documentation/clients.
     "kothrud_connector_slowdown": {
-        "edge": (1563310394, 4704828557, 0),
-        "description": "Simulated slowdown on the Kothrud connector road",
+        "edge": (4704828557, 4704828553, 0),
+        "description": "Simulated slowdown on a Kothrud alternative corridor",
     },
 }
 

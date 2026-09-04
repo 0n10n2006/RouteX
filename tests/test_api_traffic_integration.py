@@ -31,7 +31,7 @@ def test_kothrud_api_saves_traffic_metrics_and_reoptimizes(tmp_path):
     assert body["before"]["travel_time"] is not None
     assert body["after_incident"]["scenario"] == "kothrud_incident"
     assert body["after_incident"]["travel_time"] is not None
-    assert body["incident"]["scenario"] == "kothrud_connector_slowdown"
+    assert body["incident"]["scenario"] == "kothrud_alternative_corridor_slowdown"
     assert body["traffic_metadata"]["after_incident"]["incident"] == body["incident"]
 
     saved = client.get(f"/results/{body['after_incident']['run_id']}")
