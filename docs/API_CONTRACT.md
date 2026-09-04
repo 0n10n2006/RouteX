@@ -249,14 +249,17 @@ The supplied name is lowercased and trimmed.
   "name": "kothrud_test",
   "description": "Small custom test",
   "distance_matrix": [[0, 5, 8], [5, 0, 4], [8, 4, 0]],
+  "travel_time_matrix": [[0, 50, 80], [50, 0, 40], [80, 40, 0]],
   "vehicles": [{"id": 1, "capacity": 10}],
   "customers": [{"id": 1, "demand": 3}, {"id": 2, "demand": 4}]
 }
 ```
 
-The matrix must contain the depot plus every customer ID. For a highest customer
-ID of `2`, it must have at least three rows. Non-empty `vehicles` and `customers`
-are required.
+`distance_matrix` must contain the depot plus every customer ID. For a highest
+customer ID of `2`, it must have at least three rows. `travel_time_matrix` is
+optional; when supplied it must be square and the same size as `distance_matrix`.
+The optimizer minimises travel time for that scenario and reports both metrics.
+Non-empty `vehicles` and `customers` are required.
 
 Success response:
 
