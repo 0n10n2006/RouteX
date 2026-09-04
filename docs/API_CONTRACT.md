@@ -222,6 +222,15 @@ Returns only chart data for one saved run.
 For greedy, `convergence` is `[]` and `iterations` is `0`; show no line chart.
 Missing IDs return the same `404` shape as `GET /results/{run_id}`.
 
+### `GET /results/{run_id}/geometry`
+
+Returns road-following route geometry for a saved **Kothrud OSM** run as a
+GeoJSON FeatureCollection. Each feature represents one vehicle route; each
+coordinate is `[longitude, latitude]`. The response also includes the depot /
+customer `locations` and any simulated `incident` metadata.
+
+Matrix-only scenarios return `422` because the API will not invent map lines.
+
 ### `GET /scenarios`
 
 Returns all built-in and custom scenarios in stable numeric-ID order. Use this to

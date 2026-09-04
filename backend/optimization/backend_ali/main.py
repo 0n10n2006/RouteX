@@ -28,10 +28,13 @@ from ..fitness import calculate_metrics, fitness
 from ..problem import ProblemInstance
 from ..constraints import check_customer_visits, check_depot, check_capacity
 from ..traffic_scenarios import (
+    KOTHRUD_OSM_FILE,
     create_kothrud_problem,
     create_kothrud_problem_with_incident,
     resolve_kothrud_incident,
 )
+from traffic.graph_builder import build_route_geometry
+from traffic.osm_loader import load_road_network, prepare_graph
 
 from .database import (
     create_tables,
@@ -549,6 +552,52 @@ def result_convergence(run_id: int):
         "scenario": row["scenario"],
         "iterations": row.get("iterations"),
         "convergence": convergence,
+    }
+
+
+@app.get("/results/{run_id}/geometry")
+def result_geometry(run_id: int):
+    """Return real OSM road geometry for each vehicle route as GeoJSON.
+
+    Only Kothrud OSM runs include the required source locations and traffic
+    metadata. Matrix-only scenarios intentionally cannot invent map geometry.
+    """
+    row = get_result(run_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"No run with id {run_id}")
+
+    metadata = row.get("traffic_metadata") or {}
+    if metadata.get("source") != "Kothrud OSM extract with simulated traffic":
+        raise HTTPException(
+            status_code=422,
+            detail="Road geometry is available only for Kothrud OSM runs",
+        )
+
+    incident = metadata.get("incident") or {}
+    incident_edges = None
+    if incident.get("edge"):
+        incident_edges = {
+            tuple(incident["edge"]): incident.get("speed_factor", 1.0)
+        }
+
+    try:
+        graph = prepare_graph(load_road_network(KOTHRUD_OSM_FILE))
+        geometry = build_route_geometry(
+            graph,
+            metadata["locations"],
+            row["routes"],
+            traffic_factors=metadata.get("traffic_factors"),
+            incident_edges=incident_edges,
+        )
+    except (KeyError, ValueError) as error:
+        raise HTTPException(status_code=422, detail=str(error))
+
+    return {
+        **geometry,
+        "run_id": run_id,
+        "scenario": row["scenario"],
+        "locations": metadata["locations"],
+        "incident": incident or None,
     }
 
 # --------------------------------------------------

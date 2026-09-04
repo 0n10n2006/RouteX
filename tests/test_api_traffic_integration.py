@@ -38,6 +38,12 @@ def test_kothrud_api_saves_traffic_metrics_and_reoptimizes(tmp_path):
     assert saved.status_code == 200
     assert saved.json()["travel_time"] == body["after_incident"]["travel_time"]
 
+    geometry = client.get(f"/results/{body['after_incident']['run_id']}/geometry")
+    assert geometry.status_code == 200
+    assert geometry.json()["type"] == "FeatureCollection"
+    assert len(geometry.json()["features"]) == body["after_incident"]["vehicles_used"]
+    assert geometry.json()["features"][0]["geometry"]["type"] == "LineString"
+
 
 def test_kothrud_incident_accepts_a_specific_osm_edge(tmp_path):
     database.DATABASE = tmp_path / "specific-edge-test.db"
