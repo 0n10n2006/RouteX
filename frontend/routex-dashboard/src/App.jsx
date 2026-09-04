@@ -15,6 +15,13 @@ import "./App.css";
 
 const API_URL = "http://127.0.0.1:8000";
 
+// Keep full numeric precision in the API/database, but make dashboard values
+// readable for users (for example, 1932.1941857651207 -> 1932.19).
+const formatMetric = (value, digits = 2) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? number.toFixed(digits) : "—";
+};
+
 function App() {
   const [algorithm, setAlgorithm] = useState("qpso");
   const [scenario, setScenario] = useState("medium");
@@ -404,14 +411,14 @@ function DashboardView({
       <div className="kpi-grid">
         <KpiCard
           label="FITNESS"
-          value={result?.fitness ?? "—"}
+          value={formatMetric(result?.fitness)}
           icon="◈"
           accent="cyan"
         />
 
         <KpiCard
           label="TOTAL DISTANCE"
-          value={result?.distance ?? "—"}
+          value={formatMetric(result?.distance)}
           unit={result ? (result.traffic_metadata ? "m" : "units") : ""}
           icon="↗"
           accent="blue"
@@ -419,7 +426,7 @@ function DashboardView({
 
         <KpiCard
           label="TRAVEL TIME"
-          value={result?.travel_time ?? "—"}
+          value={formatMetric(result?.travel_time)}
           unit={result?.travel_time != null ? "sec" : ""}
           icon="◷"
           accent="purple"
@@ -601,7 +608,7 @@ function DashboardView({
                 <span className="run-id">#{item.id}</span>
                 <strong>{item.algorithm}</strong>
                 <span>{item.scenario}</span>
-                <span>{item.fitness}</span>
+                <span>{formatMetric(item.fitness)}</span>
                 <span>→</span>
               </button>
             ))}
@@ -694,14 +701,14 @@ function OptimizationView({
           <div className="kpi-grid">
             <KpiCard
               label="FITNESS"
-              value={result.fitness}
+              value={formatMetric(result.fitness)}
               icon="◈"
               accent="cyan"
             />
 
             <KpiCard
               label="TOTAL DISTANCE"
-              value={result.distance}
+              value={formatMetric(result.distance)}
               unit={result.traffic_metadata ? "m" : "units"}
               icon="↗"
               accent="blue"
@@ -709,7 +716,7 @@ function OptimizationView({
 
             <KpiCard
               label="TRAVEL TIME"
-              value={result.travel_time ?? "—"}
+              value={formatMetric(result.travel_time)}
               unit={result.travel_time != null ? "sec" : ""}
               icon="◷"
               accent="purple"
@@ -1047,9 +1054,9 @@ function ComparisonView({
               >
                 <strong>{item.algorithm}</strong>
 
-                <span>{item.best_fitness}</span>
+                <span>{formatMetric(item.best_fitness)}</span>
 
-                <span>{item.mean_fitness}</span>
+                <span>{formatMetric(item.mean_fitness)}</span>
 
                 <span>{item.mean_runtime}s</span>
 
@@ -1133,7 +1140,7 @@ function HistoryView({
                 {item.scenario}
               </span>
 
-              <strong>{item.fitness}</strong>
+              <strong>{formatMetric(item.fitness)}</strong>
 
               <span>
                 {item.runtime !== null
@@ -1241,7 +1248,7 @@ function ComparisonTable({
             {item.algorithm}
           </strong>
 
-          <span>{item.best_fitness}</span>
+          <span>{formatMetric(item.best_fitness)}</span>
 
           <span>
             {Number(item.best_runtime).toFixed(6)} s
