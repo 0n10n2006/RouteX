@@ -23,6 +23,7 @@ from pydantic import BaseModel
 from ..qpso import QPSO
 from ..greedy_vrp import greedy_vrp
 from ..hybrid import hybrid_qpso
+from ..benchmark import run_ga, run_pso
 from ..scenarios import create_scenarios
 from ..fitness import calculate_metrics, fitness
 from ..problem import ProblemInstance
@@ -56,10 +57,14 @@ from .scenarios_ali import create_extra_scenarios
 QPSO_PARTICLES = 10
 QPSO_ITERATIONS = 20
 QPSO_BETA = 0.5
+GA_POPULATION_SIZE = 20
+GA_GENERATIONS = 50
+PSO_PARTICLES = 20
+PSO_ITERATIONS = 50
 
 # "greedy" is the classical baseline we measure improvement against.
 BASELINE_ALGORITHM = "Greedy (classical baseline)"
-ALL_ALGORITHMS = ["greedy", "qpso", "hybrid"]
+ALL_ALGORITHMS = ["greedy", "ga", "pso", "qpso", "hybrid"]
 BUILTIN_SCENARIOS = ["default", "low", "medium", "high", "big", "kothrud"]
 
 app = FastAPI(
@@ -83,7 +88,7 @@ app.add_middleware(
 # --------------------------------------------------
 
 class OptimizeRequest(BaseModel):
-    algorithm: str = "qpso"          # qpso | hybrid | greedy
+    algorithm: str = "qpso"          # greedy | ga | pso | qpso | hybrid
     scenario: str = "default"        # default | low | medium | high | big | custom name
     seed: int | None = None          # set it to make a run reproducible
 
@@ -288,6 +293,32 @@ def run_algorithm(algo, problem, seed=None):
         iterations = 0                    # one-shot: no iterations
         algorithm_name = "Greedy (classical baseline)"
 
+    elif algo == "ga":
+        # Classical evolutionary baseline supplied by the optimization team.
+        result = run_ga(
+            problem,
+            population_size=GA_POPULATION_SIZE,
+            generations=GA_GENERATIONS,
+        )
+        routes = result["routes"] or []
+        score = result["fitness"]
+        convergence = []  # GA currently exposes no generation-wise curve.
+        iterations = GA_GENERATIONS
+        algorithm_name = "GA"
+
+    elif algo == "pso":
+        # Classical particle swarm baseline supplied by the optimization team.
+        result = run_pso(
+            problem,
+            num_particles=PSO_PARTICLES,
+            iterations=PSO_ITERATIONS,
+        )
+        routes = result["routes"] or []
+        score = result["fitness"]
+        convergence = []  # PSO currently exposes no iteration-wise curve.
+        iterations = PSO_ITERATIONS
+        algorithm_name = "PSO"
+
     elif algo == "hybrid":
         # Flagship: QPSO explores globally, then 2-opt refines its best route.
         result = hybrid_qpso(
@@ -305,7 +336,7 @@ def run_algorithm(algo, problem, seed=None):
         iterations = QPSO_ITERATIONS
         algorithm_name = "Hybrid QPSO + 2-opt"
 
-    else:
+    elif algo == "qpso":
         # Quantum-inspired QPSO — the technical centrepiece.
         qpso = QPSO(
             num_particles=QPSO_PARTICLES,
@@ -320,6 +351,11 @@ def run_algorithm(algo, problem, seed=None):
         convergence = qpso.convergence
         iterations = QPSO_ITERATIONS
         algorithm_name = "QPSO"
+
+    else:
+        raise ValueError(
+            "Unknown algorithm. Choose one of: " + ", ".join(ALL_ALGORITHMS)
+        )
 
     runtime = time.perf_counter() - start_time
 
@@ -406,12 +442,15 @@ def optimize(request: OptimizeRequest):
 
     scenario_name, problem = build_problem(request.scenario)
 
-    return run_and_save(
-        request.algorithm,
-        scenario_name,
-        problem,
-        seed=request.seed,
-    )
+    try:
+        return run_and_save(
+            request.algorithm,
+            scenario_name,
+            problem,
+            seed=request.seed,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
 
 
 @app.post("/optimize/kothrud-incident")
@@ -758,7 +797,21 @@ def benchmark(request: BenchmarkRequest | None = None):
     # Cap the work so a stray request can't hang the server.
     seeds = max(1, min(request.seeds, 10))
     scenario_names = request.scenarios or BUILTIN_SCENARIOS
-    algorithms = request.algorithms or ALL_ALGORITHMS
+    algorithms = [
+        (algorithm or "").lower().strip()
+        for algorithm in (request.algorithms or ALL_ALGORITHMS)
+    ]
+    unknown_algorithms = sorted(set(algorithms) - set(ALL_ALGORITHMS))
+    if unknown_algorithms:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Unknown algorithms: "
+                + ", ".join(unknown_algorithms)
+                + ". Choose from: "
+                + ", ".join(ALL_ALGORITHMS)
+            ),
+        )
 
     started = time.perf_counter()
     trials = []

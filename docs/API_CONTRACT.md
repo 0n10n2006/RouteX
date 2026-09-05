@@ -116,7 +116,7 @@ Request body (all fields optional):
 
 | Field | Allowed value / behaviour |
 | --- | --- |
-| `algorithm` | `greedy`, `qpso`, or `hybrid`. Any other value currently runs QPSO. Frontend must send one of the three listed values. |
+| `algorithm` | `greedy`, `ga`, `pso`, `qpso`, or `hybrid`. Unknown values return `400`. |
 | `scenario` | A built-in name or a custom scenario name from `GET /scenarios`. Unknown names use `default`. |
 | `seed` | Integer or `null`. The same scenario + algorithm + seed is reproducible. |
 

@@ -107,7 +107,7 @@ function App() {
       const response = await axios.post(`${API_URL}/benchmark`, {
         seeds: 1,
         scenarios: [scenario],
-        algorithms: ["greedy", "qpso", "hybrid"],
+        algorithms: ["greedy", "ga", "pso", "qpso", "hybrid"],
       });
 
       setBenchmarkResult(response.data);
@@ -378,6 +378,8 @@ function DashboardView({
             onChange={setAlgorithm}
             options={[
               ["greedy", "Greedy"],
+              ["ga", "Genetic Algorithm (GA)"],
+              ["pso", "Particle Swarm Optimization (PSO)"],
               ["qpso", "QPSO"],
               ["hybrid", "Hybrid QPSO"],
             ]}
@@ -658,6 +660,8 @@ function OptimizationView({
             onChange={setAlgorithm}
             options={[
               ["greedy", "Greedy"],
+              ["ga", "Genetic Algorithm (GA)"],
+              ["pso", "Particle Swarm Optimization (PSO)"],
               ["qpso", "QPSO"],
               ["hybrid", "Hybrid QPSO"],
             ]}
