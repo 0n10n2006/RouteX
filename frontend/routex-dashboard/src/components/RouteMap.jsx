@@ -21,7 +21,7 @@ function RouteMap({ geometry }) {
     <div className="route-map-container">
       <MapContainer
         center={KOTHRUD_CENTER}
-        zoom={17}
+        zoom={15}
         scrollWheelZoom={true}
         className="route-map"
       >
