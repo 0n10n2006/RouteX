@@ -2,6 +2,7 @@ import { MapContainer, TileLayer, GeoJSON, CircleMarker, Popup } from "react-lea
 import "leaflet/dist/leaflet.css";
 
 const KOTHRUD_CENTER = [18.5095, 73.7982];
+const VEHICLE_COLOURS = ["#42d9ff", "#ff9f43", "#a78bfa", "#34d399"];
 
 function RouteMap({ geometry }) {
   if (!geometry) {
@@ -35,9 +36,15 @@ function RouteMap({ geometry }) {
             type: "FeatureCollection",
             features: geometry.features || [],
           }}
-          style={{
+          style={(feature) => ({
+            color:
+              VEHICLE_COLOURS[
+                ((feature?.properties?.vehicle_index || 1) - 1) %
+                  VEHICLE_COLOURS.length
+              ],
             weight: 6,
-          }}
+            opacity: 0.9,
+          })}
         />
 
         {locations.map((location) => (

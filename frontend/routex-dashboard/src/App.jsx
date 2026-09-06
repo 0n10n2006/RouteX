@@ -23,6 +23,10 @@ const formatMetric = (value, digits = 2) => {
   return Number.isFinite(number) ? number.toFixed(digits) : "—";
 };
 
+const isKothrudRun = (run) =>
+  run?.traffic_metadata?.source ===
+  "Kothrud OSM extract with simulated traffic";
+
 function App() {
   const [algorithm, setAlgorithm] = useState("qpso");
   const [scenario, setScenario] = useState("medium");
@@ -92,7 +96,7 @@ const runOptimization = async () => {
     setActiveView("optimization");
 
     // Fetch road geometry for Kothrud scenario
-    if (scenario === "kothrud" && optimizationResult.run_id) {
+    if (isKothrudRun(optimizationResult) && optimizationResult.run_id) {
       try {
         console.log(
           "Fetching geometry for run:",
@@ -180,8 +184,8 @@ const runOptimization = async () => {
 
       setResult(response.data);
 
-        if (response.data.scenario === "kothrud") {
-          await loadRouteGeometry(response.data.run_id);
+        if (isKothrudRun(response.data)) {
+          await loadRouteGeometry(response.data.id);
         } else {
           setRouteGeometry(null);
         }
