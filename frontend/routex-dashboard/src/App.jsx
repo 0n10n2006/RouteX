@@ -12,6 +12,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import "./App.css";
+import RouteMap from "./components/RouteMap";
 
 const API_URL = "http://127.0.0.1:8000";
 
@@ -27,6 +28,7 @@ function App() {
   const [scenario, setScenario] = useState("medium");
 
   const [result, setResult] = useState(null);
+  const [routeGeometry, setRouteGeometry] = useState(null);
   const [comparison, setComparison] = useState([]);
   const [history, setHistory] = useState([]);
 
@@ -73,31 +75,61 @@ function App() {
     loadHistory();
   }, []);
 
-  const runOptimization = async () => {
-    setLoading(true);
-    setError("");
+const runOptimization = async () => {
+  setLoading(true);
+  setError("");
 
-    try {
-      const response = await axios.post(`${API_URL}/optimize`, {
-        algorithm,
-        scenario,
-        seed: 42,
-      });
+  try {
+    const response = await axios.post(`${API_URL}/optimize`, {
+      algorithm,
+      scenario,
+      seed: 42,
+    });
 
-      setResult(response.data);
-      setActiveView("optimization");
+    const optimizationResult = response.data;
 
-      await loadComparison();
-      await loadHistory();
-    } catch (err) {
-      console.error(err);
-      setError(
-        "Could not connect to RouteX backend. Make sure FastAPI is running."
-      );
-    } finally {
-      setLoading(false);
+    setResult(optimizationResult);
+    setActiveView("optimization");
+
+    // Fetch road geometry for Kothrud scenario
+    if (scenario === "kothrud" && optimizationResult.run_id) {
+      try {
+        console.log(
+          "Fetching geometry for run:",
+          optimizationResult.run_id
+        );
+
+        const geometryResponse = await axios.get(
+          `${API_URL}/results/${optimizationResult.run_id}/geometry`
+        );
+
+        console.log("Geometry received:", geometryResponse.data);
+
+        setRouteGeometry(geometryResponse.data);
+      } catch (geometryError) {
+        console.error(
+          "Could not fetch route geometry:",
+          geometryError
+        );
+
+        setRouteGeometry(null);
+      }
+    } else {
+      setRouteGeometry(null);
     }
-  };
+
+    await loadComparison();
+    await loadHistory();
+  } catch (err) {
+    console.error(err);
+
+    setError(
+      "Could not connect to RouteX backend. Make sure FastAPI is running."
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   const runBenchmark = async () => {
     setBenchmarkLoading(true);
@@ -125,6 +157,20 @@ function App() {
     }
   };
 
+  const loadRouteGeometry = async (runId) => {
+    try {
+      const response = await axios.get(
+        `${API_URL}/results/${runId}/geometry`
+      );
+
+      setRouteGeometry(response.data);
+    } catch (err) {
+      console.error(err);
+      setRouteGeometry(null);
+      console.error("Route geometry is available only for Kothrud OSM runs.");
+    }
+  };
+
   const loadHistoricalResult = async (runId) => {
     try {
       setLoading(true);
@@ -133,7 +179,15 @@ function App() {
       const response = await axios.get(`${API_URL}/results/${runId}`);
 
       setResult(response.data);
-      setActiveView("optimization");
+
+        if (response.data.scenario === "kothrud") {
+          await loadRouteGeometry(response.data.run_id);
+        } else {
+          setRouteGeometry(null);
+        }
+
+        setActiveView("optimization");
+
     } catch (err) {
       console.error(err);
       setError("Could not load the selected optimization result.");
@@ -288,8 +342,9 @@ function App() {
 
           {/* OPTIMIZATION */}
           {activeView === "optimization" && (
-            <OptimizationView
+            <OptimizationView 
               result={result}
+              routeGeometry={routeGeometry}
               loading={loading}
               algorithm={algorithm}
               scenario={scenario}
@@ -627,6 +682,7 @@ function DashboardView({
 
 function OptimizationView({
   result,
+  routeGeometry,
   loading,
   algorithm,
   scenario,
@@ -798,6 +854,27 @@ function OptimizationView({
               ))}
             </div>
           </section>
+
+          {/* ROUTE MAP */}
+          {scenario === "kothrud" && routeGeometry && (
+            <section className="panel route-map-panel">
+              <div className="panel-heading">
+                <div>
+                  <span className="micro-label">LIVE ROAD NETWORK</span>
+                  <h2>Optimized Route Map</h2>
+                  <p>
+                    Real OpenStreetMap road geometry for the Kothrud scenario.
+                  </p>
+                </div>
+
+                <span className="status-badge success">
+                  OSM ROUTE
+                </span>
+              </div>
+
+              <RouteMap geometry={routeGeometry} />
+            </section>
+          )}
 
           <section className="panel chart-panel">
             <div className="panel-heading">
