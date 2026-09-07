@@ -860,7 +860,7 @@ function OptimizationView({
           </section>
 
           {/* ROUTE MAP */}
-          {scenario === "kothrud" && routeGeometry && (
+          {isKothrudRun(result) && routeGeometry && (
             <section className="panel route-map-panel">
               <div className="panel-heading">
                 <div>
