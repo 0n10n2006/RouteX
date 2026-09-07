@@ -1,5 +1,6 @@
 import random
 import time
+import statistics
 
 from backend.optimization.problem import ProblemInstance
 from backend.optimization.qpso import QPSO
@@ -251,9 +252,8 @@ def main():
                 problem
             )
 
-            injections = feedback_result[
-                "successful_injections"
-            ]
+            injections = 0
+                            
 
             # --------------------------------------------------
             # Store results
@@ -357,6 +357,10 @@ def main():
             sum(feedback_times)
             / len(feedback_times)
         )
+        
+        std_qpso = statistics.stdev(qpso_scores)
+        std_local = statistics.stdev(local_search_scores)
+        std_feedback = statistics.stdev(feedback_scores)
 
         avg_injections = (
             sum(injection_counts)
@@ -407,6 +411,17 @@ def main():
         print(
             f"Feedback Hybrid avg: {avg_feedback:.2f}"
         )
+        print(
+    f"\nQPSO consistency (SD):        {std_qpso:.2f}"
+)
+
+        print(
+    f"QPSO + 2-opt consistency (SD): {std_local:.2f}"
+)
+
+        print(
+    f"Feedback Hybrid consistency:   {std_feedback:.2f}"
+)
 
         print(
             f"\n2-opt improvement:   "
