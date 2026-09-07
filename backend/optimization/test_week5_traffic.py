@@ -1,12 +1,11 @@
 import random
 import time
+import csv
 
 from backend.optimization.traffic_scenarios import (
     create_kothrud_problem,
     create_kothrud_problem_with_incident,
-    resolve_kothrud_incident,
     KOTHRUD_TRAFFIC_FACTORS,
-    KOTHRUD_INCIDENT_SCENARIOS,
 )
 
 from backend.optimization.hybrid import hybrid_qpso
@@ -75,9 +74,6 @@ def create_peak_problem():
     """
     Create the same Kothrud road problem but with stronger
     simulated traffic slowdown.
-
-    The existing Kothrud traffic factors are multiplied by
-    an additional peak factor.
     """
 
     graph = prepare_graph(
@@ -101,7 +97,6 @@ def create_peak_problem():
         traffic_factors=peak_factors,
     )
 
-    # Keep the same vehicles and customers
     from backend.optimization.problem import ProblemInstance
 
     return ProblemInstance(
@@ -144,6 +139,25 @@ def print_result(name, result):
 
 def main():
 
+    csv_file = "week5_results.csv"
+
+    # -----------------------------------------------------
+    # CREATE CSV FILE AND HEADER
+    # -----------------------------------------------------
+
+    with open(csv_file, "w", newline="") as file:
+        writer = csv.writer(file)
+
+        writer.writerow([
+            "scenario",
+            "seed",
+            "fitness",
+            "distance",
+            "travel_time",
+            "runtime",
+            "routes"
+        ])
+
     print("\nWEEK 5 - DYNAMIC TRAFFIC & INCIDENT EXPERIMENTS")
     print("=" * 60)
 
@@ -158,15 +172,39 @@ def main():
     normal_results = []
 
     for seed in SEEDS:
+
         result = run_hybrid(normal_problem, seed)
+
         normal_results.append(result)
+
+        # Save individual run to CSV
+        with open(csv_file, "a", newline="") as file:
+            writer = csv.writer(file)
+
+            writer.writerow([
+                "Normal",
+                seed,
+                result["fitness"],
+                result["distance"],
+                result["travel_time"],
+                result["runtime"],
+                result["routes"],
+            ])
 
     normal_result = {
         "routes": normal_results[0]["routes"],
-        "fitness": sum(r["fitness"] for r in normal_results) / len(normal_results),
-        "distance": sum(r["distance"] for r in normal_results) / len(normal_results),
-        "travel_time": sum(r["travel_time"] for r in normal_results) / len(normal_results),
-        "runtime": sum(r["runtime"] for r in normal_results) / len(normal_results),
+        "fitness": sum(
+            r["fitness"] for r in normal_results
+        ) / len(normal_results),
+        "distance": sum(
+            r["distance"] for r in normal_results
+        ) / len(normal_results),
+        "travel_time": sum(
+            r["travel_time"] for r in normal_results
+        ) / len(normal_results),
+        "runtime": sum(
+            r["runtime"] for r in normal_results
+        ) / len(normal_results),
     }
 
     print_result(
@@ -185,15 +223,39 @@ def main():
     peak_results = []
 
     for seed in SEEDS:
+
         result = run_hybrid(peak_problem, seed)
+
         peak_results.append(result)
+
+        # Save individual run to CSV
+        with open(csv_file, "a", newline="") as file:
+            writer = csv.writer(file)
+
+            writer.writerow([
+                "Peak Traffic",
+                seed,
+                result["fitness"],
+                result["distance"],
+                result["travel_time"],
+                result["runtime"],
+                result["routes"],
+            ])
 
     peak_result = {
         "routes": peak_results[0]["routes"],
-        "fitness": sum(r["fitness"] for r in peak_results) / len(peak_results),
-        "distance": sum(r["distance"] for r in peak_results) / len(peak_results),
-        "travel_time": sum(r["travel_time"] for r in peak_results) / len(peak_results),
-        "runtime": sum(r["runtime"] for r in peak_results) / len(peak_results),
+        "fitness": sum(
+            r["fitness"] for r in peak_results
+        ) / len(peak_results),
+        "distance": sum(
+            r["distance"] for r in peak_results
+        ) / len(peak_results),
+        "travel_time": sum(
+            r["travel_time"] for r in peak_results
+        ) / len(peak_results),
+        "runtime": sum(
+            r["runtime"] for r in peak_results
+        ) / len(peak_results),
     }
 
     print_result(
@@ -217,15 +279,39 @@ def main():
     single_results = []
 
     for seed in SEEDS:
+
         result = run_hybrid(single_incident_problem, seed)
+
         single_results.append(result)
+
+        # Save individual run to CSV
+        with open(csv_file, "a", newline="") as file:
+            writer = csv.writer(file)
+
+            writer.writerow([
+                "Single Incident",
+                seed,
+                result["fitness"],
+                result["distance"],
+                result["travel_time"],
+                result["runtime"],
+                result["routes"],
+            ])
 
     single_result = {
         "routes": single_results[0]["routes"],
-        "fitness": sum(r["fitness"] for r in single_results) / len(single_results),
-        "distance": sum(r["distance"] for r in single_results) / len(single_results),
-        "travel_time": sum(r["travel_time"] for r in single_results) / len(single_results),
-        "runtime": sum(r["runtime"] for r in single_results) / len(single_results),
+        "fitness": sum(
+            r["fitness"] for r in single_results
+        ) / len(single_results),
+        "distance": sum(
+            r["distance"] for r in single_results
+        ) / len(single_results),
+        "travel_time": sum(
+            r["travel_time"] for r in single_results
+        ) / len(single_results),
+        "runtime": sum(
+            r["runtime"] for r in single_results
+        ) / len(single_results),
     }
 
     print_result(
@@ -280,15 +366,42 @@ def main():
     multiple_results = []
 
     for seed in SEEDS:
-        result = run_hybrid(multiple_incident_problem, seed)
+
+        result = run_hybrid(
+            multiple_incident_problem,
+            seed
+        )
+
         multiple_results.append(result)
+
+        # Save individual run to CSV
+        with open(csv_file, "a", newline="") as file:
+            writer = csv.writer(file)
+
+            writer.writerow([
+                "Multiple Incidents",
+                seed,
+                result["fitness"],
+                result["distance"],
+                result["travel_time"],
+                result["runtime"],
+                result["routes"],
+            ])
 
     multiple_result = {
         "routes": multiple_results[0]["routes"],
-        "fitness": sum(r["fitness"] for r in multiple_results) / len(multiple_results),
-        "distance": sum(r["distance"] for r in multiple_results) / len(multiple_results),
-        "travel_time": sum(r["travel_time"] for r in multiple_results) / len(multiple_results),
-        "runtime": sum(r["runtime"] for r in multiple_results) / len(multiple_results),
+        "fitness": sum(
+            r["fitness"] for r in multiple_results
+        ) / len(multiple_results),
+        "distance": sum(
+            r["distance"] for r in multiple_results
+        ) / len(multiple_results),
+        "travel_time": sum(
+            r["travel_time"] for r in multiple_results
+        ) / len(multiple_results),
+        "runtime": sum(
+            r["runtime"] for r in multiple_results
+        ) / len(multiple_results),
     }
 
     print_result(
@@ -340,10 +453,12 @@ def main():
         new_time = result["travel_time"]
 
         if normal_time and normal_time != 0:
+
             change = (
                 (new_time - normal_time)
                 / normal_time
             ) * 100
+
         else:
             change = 0
 
@@ -352,6 +467,17 @@ def main():
             f"{normal_time:.2f} -> {new_time:.2f} "
             f"({change:+.2f}%)"
         )
+
+    # -----------------------------------------------------
+    # CSV COMPLETE
+    # -----------------------------------------------------
+
+    print("\n" + "=" * 60)
+    print("CSV SAVED")
+    print("=" * 60)
+
+    print("File:", csv_file)
+    print("Total runs saved:", len(SEEDS) * 4)
 
 
 if __name__ == "__main__":
