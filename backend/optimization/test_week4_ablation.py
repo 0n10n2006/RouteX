@@ -1,3 +1,4 @@
+
 import random
 import time
 import statistics
@@ -122,6 +123,7 @@ def run_qpso_2opt(problem, seed):
                     improved_score = candidate_score
 
                 if improved_score < best_score:
+
                     best_routes = [
                         route[:]
                         for route in improved_routes
@@ -134,6 +136,7 @@ def run_qpso_2opt(problem, seed):
     runtime = time.perf_counter() - start
 
     if best_routes is None:
+
         result = qpso.get_best_solution(problem)
 
         if result is None:
@@ -149,9 +152,12 @@ def run_qpso_2opt(problem, seed):
     }, runtime, local_search_count
 
 
-def run_feedback_hybrid(problem, seed):
+def run_adaptive_hybrid(problem, seed):
     """
-    QPSO + 2-opt + feedback injection.
+    Adaptive Hybrid QPSO + 2-opt.
+
+    The current hybrid implementation does NOT use
+    feedback injection. It returns local_search_count.
     """
 
     random.seed(seed)
@@ -183,13 +189,13 @@ def main():
 
         qpso_scores = []
         local_search_scores = []
-        feedback_scores = []
+        hybrid_scores = []
 
         qpso_times = []
         local_search_times = []
-        feedback_times = []
+        hybrid_times = []
 
-        injection_counts = []
+        hybrid_local_search_counts = []
         local_search_counts = []
 
         for seed in seeds:
@@ -237,23 +243,26 @@ def main():
             )
 
             # --------------------------------------------------
-            # 3. Feedback Hybrid
+            # 3. Adaptive Hybrid QPSO + 2-opt
             # --------------------------------------------------
 
-            feedback_result, feedback_time = run_feedback_hybrid(
+            hybrid_result, hybrid_time = run_adaptive_hybrid(
                 problem,
                 seed
             )
 
-            feedback_score = feedback_result["fitness"]
+            hybrid_score = hybrid_result["fitness"]
 
-            feedback_valid = validate(
-                feedback_result["routes"],
+            hybrid_valid = validate(
+                hybrid_result["routes"],
                 problem
             )
 
-            injections = 0
-                            
+            # Current hybrid.py returns local_search_count.
+            hybrid_ls_count = hybrid_result.get(
+                "local_search_count",
+                0
+            )
 
             # --------------------------------------------------
             # Store results
@@ -261,14 +270,19 @@ def main():
 
             qpso_scores.append(qpso_score)
             local_search_scores.append(local_score)
-            feedback_scores.append(feedback_score)
+            hybrid_scores.append(hybrid_score)
 
             qpso_times.append(qpso_time)
             local_search_times.append(local_time)
-            feedback_times.append(feedback_time)
+            hybrid_times.append(hybrid_time)
 
-            injection_counts.append(injections)
-            local_search_counts.append(ls_count)
+            hybrid_local_search_counts.append(
+                hybrid_ls_count
+            )
+
+            local_search_counts.append(
+                ls_count
+            )
 
             # --------------------------------------------------
             # Improvements relative to QPSO
@@ -280,15 +294,15 @@ def main():
                 * 100
             )
 
-            feedback_improvement = (
-                (qpso_score - feedback_score)
+            hybrid_improvement = (
+                (qpso_score - hybrid_score)
                 / qpso_score
                 * 100
             )
 
-            # Additional benefit of feedback over plain 2-opt
-            feedback_gain = (
-                (local_score - feedback_score)
+            # Additional benefit of hybrid over plain 2-opt
+            hybrid_gain = (
+                (local_score - hybrid_score)
                 / local_score
                 * 100
             )
@@ -298,14 +312,14 @@ def main():
             )
 
             print(
-                f"  QPSO:              "
+                f"  QPSO:                  "
                 f"{qpso_score:.2f} | "
                 f"{qpso_time:.3f}s | "
                 f"feasible={qpso_valid}"
             )
 
             print(
-                f"  QPSO + 2-opt:      "
+                f"  QPSO + 2-opt:          "
                 f"{local_score:.2f} | "
                 f"{local_time:.3f}s | "
                 f"improvement={local_improvement:.2f}% | "
@@ -314,33 +328,36 @@ def main():
             )
 
             print(
-                f"  Feedback Hybrid:   "
-                f"{feedback_score:.2f} | "
-                f"{feedback_time:.3f}s | "
-                f"improvement={feedback_improvement:.2f}% | "
-                f"injections={injections} | "
-                f"feasible={feedback_valid}"
+                f"  Adaptive Hybrid:       "
+                f"{hybrid_score:.2f} | "
+                f"{hybrid_time:.3f}s | "
+                f"improvement={hybrid_improvement:.2f}% | "
+                f"LS triggers={hybrid_ls_count} | "
+                f"feasible={hybrid_valid}"
             )
 
             print(
-                f"  Feedback gain over "
-                f"2-opt: {feedback_gain:.2f}%"
+                f"  Hybrid gain over "
+                f"2-opt: {hybrid_gain:.2f}%"
             )
 
         # ------------------------------------------------------
         # Averages
         # ------------------------------------------------------
 
-        avg_qpso = sum(qpso_scores) / len(qpso_scores)
+        avg_qpso = (
+            sum(qpso_scores)
+            / len(qpso_scores)
+        )
 
         avg_local = (
             sum(local_search_scores)
             / len(local_search_scores)
         )
 
-        avg_feedback = (
-            sum(feedback_scores)
-            / len(feedback_scores)
+        avg_hybrid = (
+            sum(hybrid_scores)
+            / len(hybrid_scores)
         )
 
         avg_qpso_time = (
@@ -353,24 +370,36 @@ def main():
             / len(local_search_times)
         )
 
-        avg_feedback_time = (
-            sum(feedback_times)
-            / len(feedback_times)
+        avg_hybrid_time = (
+            sum(hybrid_times)
+            / len(hybrid_times)
         )
-        
+
+        # ------------------------------------------------------
+        # Standard deviations
+        # ------------------------------------------------------
+
         std_qpso = statistics.stdev(qpso_scores)
         std_local = statistics.stdev(local_search_scores)
-        std_feedback = statistics.stdev(feedback_scores)
+        std_hybrid = statistics.stdev(hybrid_scores)
 
-        avg_injections = (
-            sum(injection_counts)
-            / len(injection_counts)
-        )
+        # ------------------------------------------------------
+        # Average local-search triggers
+        # ------------------------------------------------------
 
-        avg_ls_triggers = (
+        avg_local_triggers = (
             sum(local_search_counts)
             / len(local_search_counts)
         )
+
+        avg_hybrid_triggers = (
+            sum(hybrid_local_search_counts)
+            / len(hybrid_local_search_counts)
+        )
+
+        # ------------------------------------------------------
+        # Improvements
+        # ------------------------------------------------------
 
         local_improvement = (
             (avg_qpso - avg_local)
@@ -378,14 +407,14 @@ def main():
             * 100
         )
 
-        feedback_improvement = (
-            (avg_qpso - avg_feedback)
+        hybrid_improvement = (
+            (avg_qpso - avg_hybrid)
             / avg_qpso
             * 100
         )
 
-        feedback_gain = (
-            (avg_local - avg_feedback)
+        hybrid_gain = (
+            (avg_local - avg_hybrid)
             / avg_local
             * 100
         )
@@ -401,66 +430,73 @@ def main():
         )
 
         print(
-            f"QPSO avg:            {avg_qpso:.2f}"
+            f"QPSO avg:                  "
+            f"{avg_qpso:.2f}"
         )
 
         print(
-            f"QPSO + 2-opt avg:    {avg_local:.2f}"
+            f"QPSO + 2-opt avg:          "
+            f"{avg_local:.2f}"
         )
 
         print(
-            f"Feedback Hybrid avg: {avg_feedback:.2f}"
+            f"Adaptive Hybrid avg:       "
+            f"{avg_hybrid:.2f}"
         )
-        print(
-    f"\nQPSO consistency (SD):        {std_qpso:.2f}"
-)
 
         print(
-    f"QPSO + 2-opt consistency (SD): {std_local:.2f}"
-)
+            f"\nQPSO consistency (SD):       "
+            f"{std_qpso:.2f}"
+        )
 
         print(
-    f"Feedback Hybrid consistency:   {std_feedback:.2f}"
-)
+            f"QPSO + 2-opt consistency:    "
+            f"{std_local:.2f}"
+        )
 
         print(
-            f"\n2-opt improvement:   "
+            f"Adaptive Hybrid consistency: "
+            f"{std_hybrid:.2f}"
+        )
+
+        print(
+            f"\n2-opt improvement:            "
             f"{local_improvement:.2f}%"
         )
 
         print(
-            f"Feedback improvement:"
-            f" {feedback_improvement:.2f}%"
+            f"Hybrid improvement:           "
+            f"{hybrid_improvement:.2f}%"
         )
 
         print(
-            f"Feedback gain over 2-opt:"
-            f" {feedback_gain:.2f}%"
+            f"Hybrid gain over 2-opt:       "
+            f"{hybrid_gain:.2f}%"
         )
 
         print(
-            f"\nAvg LS triggers:      "
-            f"{avg_ls_triggers:.2f}"
+            f"\nAvg QPSO + 2-opt LS triggers: "
+            f"{avg_local_triggers:.2f}"
         )
 
         print(
-            f"Avg injections:       "
-            f"{avg_injections:.2f}"
+            f"Avg Hybrid LS triggers:       "
+            f"{avg_hybrid_triggers:.2f}"
         )
 
         print(
-            f"\nAvg QPSO time:        "
+            f"\nAvg QPSO time:                "
             f"{avg_qpso_time:.3f}s"
         )
 
         print(
-            f"Avg QPSO + 2-opt:     "
+            f"Avg QPSO + 2-opt time:        "
             f"{avg_local_time:.3f}s"
         )
 
         print(
-            f"Avg Feedback Hybrid:  "
-            f"{avg_feedback_time:.3f}s"
+            f"Avg Adaptive Hybrid time:     "
+            f"{avg_hybrid_time:.3f}s"
         )
 
     print("\n" + "=" * 80)
@@ -469,3 +505,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
