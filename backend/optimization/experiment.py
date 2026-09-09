@@ -1,3 +1,4 @@
+
 import time
 import random
 
@@ -8,9 +9,11 @@ from .greedy_vrp import greedy_vrp
 from .qpso import QPSO
 from .hybrid import hybrid_qpso
 from .fitness import fitness
+from .constraints import validate
 from .scenarios import create_scenarios
 from .ga import GeneticAlgorithm
 from .pso import ParticleSwarmOptimization
+
 
 def run_greedy(problem):
     start = time.perf_counter()
@@ -20,7 +23,7 @@ def run_greedy(problem):
     runtime = time.perf_counter() - start
     score = fitness(routes, problem)
 
-    return score, runtime
+    return routes, score, runtime
 
 
 def run_qpso(problem):
@@ -38,7 +41,8 @@ def run_qpso(problem):
 
     runtime = time.perf_counter() - start
 
-    return result["fitness"], runtime
+    return result["routes"], result["fitness"], runtime
+
 
 def run_ga(problem):
     start = time.perf_counter()
@@ -52,7 +56,8 @@ def run_ga(problem):
 
     runtime = time.perf_counter() - start
 
-    return result["fitness"], runtime
+    return result["routes"], result["fitness"], runtime
+
 
 def run_pso(problem):
     start = time.perf_counter()
@@ -66,7 +71,7 @@ def run_pso(problem):
 
     runtime = time.perf_counter() - start
 
-    return result["fitness"], runtime
+    return result["routes"], result["fitness"], runtime
 
 
 def run_hybrid(problem):
@@ -81,11 +86,12 @@ def run_hybrid(problem):
 
     runtime = time.perf_counter() - start
 
-    return result["fitness"], runtime
+    return result["routes"], result["fitness"], runtime
 
 
 def average(values):
     return sum(values) / len(values)
+
 
 def improvement_percent(baseline, new):
 
@@ -93,6 +99,7 @@ def improvement_percent(baseline, new):
         return 0.0
 
     return ((baseline - new) / baseline) * 100
+
 
 if __name__ == "__main__":
 
@@ -118,25 +125,31 @@ if __name__ == "__main__":
         qpso_times = []
         hybrid_times = []
 
+        greedy_feasible = 0
+        ga_feasible = 0
+        pso_feasible = 0
+        qpso_feasible = 0
+        hybrid_feasible = 0
+
         for i in range(runs):
 
-            score, runtime = run_greedy(problem)
+            routes, score, runtime = run_greedy(problem)
             greedy_scores.append(score)
             greedy_times.append(runtime)
 
-            score, runtime = run_ga(problem)
+            routes, score, runtime = run_ga(problem)
             ga_scores.append(score)
             ga_times.append(runtime)
 
-            score, runtime = run_qpso(problem)
+            routes, score, runtime = run_qpso(problem)
             qpso_scores.append(score)
             qpso_times.append(runtime)
-         
-            score, runtime = run_pso(problem)
+
+            routes, score, runtime = run_pso(problem)
             pso_scores.append(score)
             pso_times.append(runtime)
 
-            score, runtime = run_hybrid(problem)
+            routes, score, runtime = run_hybrid(problem)
             hybrid_scores.append(score)
             hybrid_times.append(runtime)
 
@@ -147,13 +160,14 @@ if __name__ == "__main__":
         pso_avg = average(pso_scores)
         qpso_avg = average(qpso_scores)
         hybrid_avg = average(hybrid_scores)
+
         print("\n===== RESULTS =====")
 
         print(
             f"Greedy: {greedy_avg:.2f} "
             f"| Runtime: {average(greedy_times):.6f}s"
         )
-     
+
         print(
             f"GA: {ga_avg:.2f} "
             f"| Runtime: {average(ga_times):.6f}s"
@@ -214,3 +228,4 @@ if __name__ == "__main__":
             f"{hybrid_wins}/{runs} "
             f"({hybrid_wins / runs * 100:.1f}%)"
         )
+

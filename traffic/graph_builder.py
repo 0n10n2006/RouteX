@@ -286,6 +286,80 @@ def build_route_matrix(
     }
 
 
+def build_route_geometry(
+    graph,
+    locations,
+    routes,
+    traffic_factors=None,
+    incident_edges=None,
+):
+    """Return road-following GeoJSON features for optimizer vehicle routes.
+
+    Coordinates use GeoJSON order: ``[longitude, latitude]``. Each feature is
+    one vehicle route stitched from the shortest traffic-adjusted OSM paths for
+    its route legs. This deliberately avoids drawing misleading straight lines
+    between customers.
+    """
+    _validate_locations(locations)
+
+    if not isinstance(routes, list):
+        raise ValueError("routes must be a list")
+
+    location_nodes = {
+        location["id"]: _nearest_node(graph, location)
+        for location in locations
+    }
+    travel_graph = _prepare_travel_times(
+        graph,
+        traffic_factors,
+        incident_edges,
+    )
+    features = []
+
+    for vehicle_index, route in enumerate(routes, start=1):
+        if not isinstance(route, list) or len(route) < 2:
+            raise ValueError(f"Route {vehicle_index} must contain at least two locations")
+        if any(location_id not in location_nodes for location_id in route):
+            raise ValueError(f"Route {vehicle_index} references an unknown location")
+
+        path_nodes = []
+        for source_id, target_id in zip(route, route[1:]):
+            try:
+                leg_nodes = nx.shortest_path(
+                    travel_graph,
+                    location_nodes[source_id],
+                    location_nodes[target_id],
+                    weight="travel_time",
+                )
+            except nx.NetworkXNoPath:
+                raise ValueError(
+                    f"No route exists between location {source_id} and location {target_id}"
+                )
+
+            path_nodes.extend(leg_nodes if not path_nodes else leg_nodes[1:])
+
+        coordinates = [
+            [float(graph.nodes[node]["x"]), float(graph.nodes[node]["y"])]
+            for node in path_nodes
+        ]
+        features.append({
+            "type": "Feature",
+            "properties": {
+                "vehicle_index": vehicle_index,
+                "route": route,
+            },
+            "geometry": {
+                "type": "LineString",
+                "coordinates": coordinates,
+            },
+        })
+
+    return {
+        "type": "FeatureCollection",
+        "features": features,
+    }
+
+
 def apply_incident(graph, incident):
     """
     Return a copy of graph with an incident speed factor applied.

@@ -12,14 +12,27 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import "./App.css";
+import RouteMap from "./components/RouteMap";
 
 const API_URL = "http://127.0.0.1:8000";
+
+// Keep full numeric precision in the API/database, but make dashboard values
+// readable for users (for example, 1932.1941857651207 -> 1932.19).
+const formatMetric = (value, digits = 2) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? number.toFixed(digits) : "—";
+};
+
+const isKothrudRun = (run) =>
+  run?.traffic_metadata?.source ===
+  "Kothrud OSM extract with simulated traffic";
 
 function App() {
   const [algorithm, setAlgorithm] = useState("qpso");
   const [scenario, setScenario] = useState("medium");
 
   const [result, setResult] = useState(null);
+  const [routeGeometry, setRouteGeometry] = useState(null);
   const [comparison, setComparison] = useState([]);
   const [history, setHistory] = useState([]);
 
@@ -66,31 +79,61 @@ function App() {
     loadHistory();
   }, []);
 
-  const runOptimization = async () => {
-    setLoading(true);
-    setError("");
+const runOptimization = async () => {
+  setLoading(true);
+  setError("");
 
-    try {
-      const response = await axios.post(`${API_URL}/optimize`, {
-        algorithm,
-        scenario,
-        seed: 42,
-      });
+  try {
+    const response = await axios.post(`${API_URL}/optimize`, {
+      algorithm,
+      scenario,
+      seed: 42,
+    });
 
-      setResult(response.data);
-      setActiveView("optimization");
+    const optimizationResult = response.data;
 
-      await loadComparison();
-      await loadHistory();
-    } catch (err) {
-      console.error(err);
-      setError(
-        "Could not connect to RouteX backend. Make sure FastAPI is running."
-      );
-    } finally {
-      setLoading(false);
+    setResult(optimizationResult);
+    setActiveView("optimization");
+
+    // Fetch road geometry for Kothrud scenario
+    if (isKothrudRun(optimizationResult) && optimizationResult.run_id) {
+      try {
+        console.log(
+          "Fetching geometry for run:",
+          optimizationResult.run_id
+        );
+
+        const geometryResponse = await axios.get(
+          `${API_URL}/results/${optimizationResult.run_id}/geometry`
+        );
+
+        console.log("Geometry received:", geometryResponse.data);
+
+        setRouteGeometry(geometryResponse.data);
+      } catch (geometryError) {
+        console.error(
+          "Could not fetch route geometry:",
+          geometryError
+        );
+
+        setRouteGeometry(null);
+      }
+    } else {
+      setRouteGeometry(null);
     }
-  };
+
+    await loadComparison();
+    await loadHistory();
+  } catch (err) {
+    console.error(err);
+
+    setError(
+      "Could not connect to RouteX backend. Make sure FastAPI is running."
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   const runBenchmark = async () => {
     setBenchmarkLoading(true);
@@ -100,7 +143,7 @@ function App() {
       const response = await axios.post(`${API_URL}/benchmark`, {
         seeds: 1,
         scenarios: [scenario],
-        algorithms: ["greedy", "qpso", "hybrid"],
+        algorithms: ["greedy", "ga", "pso", "qpso", "hybrid"],
       });
 
       setBenchmarkResult(response.data);
@@ -118,6 +161,20 @@ function App() {
     }
   };
 
+  const loadRouteGeometry = async (runId) => {
+    try {
+      const response = await axios.get(
+        `${API_URL}/results/${runId}/geometry`
+      );
+
+      setRouteGeometry(response.data);
+    } catch (err) {
+      console.error(err);
+      setRouteGeometry(null);
+      console.error("Route geometry is available only for Kothrud OSM runs.");
+    }
+  };
+
   const loadHistoricalResult = async (runId) => {
     try {
       setLoading(true);
@@ -126,7 +183,15 @@ function App() {
       const response = await axios.get(`${API_URL}/results/${runId}`);
 
       setResult(response.data);
-      setActiveView("optimization");
+
+        if (isKothrudRun(response.data)) {
+          await loadRouteGeometry(response.data.id);
+        } else {
+          setRouteGeometry(null);
+        }
+
+        setActiveView("optimization");
+
     } catch (err) {
       console.error(err);
       setError("Could not load the selected optimization result.");
@@ -165,13 +230,13 @@ function App() {
       {/* SIDEBAR */}
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">RX</div>
-
-          <div className="brand-text">
-            <strong>RouteX</strong>
-            <span>TRAFFIC OPTIMIZER</span>
-          </div>
-        </div>
+          <div className="brand-logo-container">
+           <img
+              src="/routex-logo.png"
+              alt="RouteX"
+              className="brand-logo"/>
+  </div>
+</div>
 
         <div className="sidebar-section-label">NAVIGATION</div>
 
@@ -281,8 +346,9 @@ function App() {
 
           {/* OPTIMIZATION */}
           {activeView === "optimization" && (
-            <OptimizationView
+            <OptimizationView 
               result={result}
+              routeGeometry={routeGeometry}
               loading={loading}
               algorithm={algorithm}
               scenario={scenario}
@@ -371,6 +437,8 @@ function DashboardView({
             onChange={setAlgorithm}
             options={[
               ["greedy", "Greedy"],
+              ["ga", "Genetic Algorithm (GA)"],
+              ["pso", "Particle Swarm Optimization (PSO)"],
               ["qpso", "QPSO"],
               ["hybrid", "Hybrid QPSO"],
             ]}
@@ -404,14 +472,14 @@ function DashboardView({
       <div className="kpi-grid">
         <KpiCard
           label="FITNESS"
-          value={result?.fitness ?? "—"}
+          value={formatMetric(result?.fitness)}
           icon="◈"
           accent="cyan"
         />
 
         <KpiCard
           label="TOTAL DISTANCE"
-          value={result?.distance ?? "—"}
+          value={formatMetric(result?.distance)}
           unit={result ? (result.traffic_metadata ? "m" : "units") : ""}
           icon="↗"
           accent="blue"
@@ -419,7 +487,7 @@ function DashboardView({
 
         <KpiCard
           label="TRAVEL TIME"
-          value={result?.travel_time ?? "—"}
+          value={formatMetric(result?.travel_time)}
           unit={result?.travel_time != null ? "sec" : ""}
           icon="◷"
           accent="purple"
@@ -601,7 +669,7 @@ function DashboardView({
                 <span className="run-id">#{item.id}</span>
                 <strong>{item.algorithm}</strong>
                 <span>{item.scenario}</span>
-                <span>{item.fitness}</span>
+                <span>{formatMetric(item.fitness)}</span>
                 <span>→</span>
               </button>
             ))}
@@ -618,6 +686,7 @@ function DashboardView({
 
 function OptimizationView({
   result,
+  routeGeometry,
   loading,
   algorithm,
   scenario,
@@ -651,6 +720,8 @@ function OptimizationView({
             onChange={setAlgorithm}
             options={[
               ["greedy", "Greedy"],
+              ["ga", "Genetic Algorithm (GA)"],
+              ["pso", "Particle Swarm Optimization (PSO)"],
               ["qpso", "QPSO"],
               ["hybrid", "Hybrid QPSO"],
             ]}
@@ -694,14 +765,14 @@ function OptimizationView({
           <div className="kpi-grid">
             <KpiCard
               label="FITNESS"
-              value={result.fitness}
+              value={formatMetric(result.fitness)}
               icon="◈"
               accent="cyan"
             />
 
             <KpiCard
               label="TOTAL DISTANCE"
-              value={result.distance}
+              value={formatMetric(result.distance)}
               unit={result.traffic_metadata ? "m" : "units"}
               icon="↗"
               accent="blue"
@@ -709,7 +780,7 @@ function OptimizationView({
 
             <KpiCard
               label="TRAVEL TIME"
-              value={result.travel_time ?? "—"}
+              value={formatMetric(result.travel_time)}
               unit={result.travel_time != null ? "sec" : ""}
               icon="◷"
               accent="purple"
@@ -787,6 +858,27 @@ function OptimizationView({
               ))}
             </div>
           </section>
+
+          {/* ROUTE MAP */}
+          {isKothrudRun(result) && routeGeometry && (
+            <section className="panel route-map-panel">
+              <div className="panel-heading">
+                <div>
+                  <span className="micro-label">LIVE ROAD NETWORK</span>
+                  <h2>Optimized Route Map</h2>
+                  <p>
+                    Real OpenStreetMap road geometry for the Kothrud scenario.
+                  </p>
+                </div>
+
+                <span className="status-badge success">
+                  OSM ROUTE
+                </span>
+              </div>
+
+              <RouteMap geometry={routeGeometry} />
+            </section>
+          )}
 
           <section className="panel chart-panel">
             <div className="panel-heading">
@@ -1047,9 +1139,9 @@ function ComparisonView({
               >
                 <strong>{item.algorithm}</strong>
 
-                <span>{item.best_fitness}</span>
+                <span>{formatMetric(item.best_fitness)}</span>
 
-                <span>{item.mean_fitness}</span>
+                <span>{formatMetric(item.mean_fitness)}</span>
 
                 <span>{item.mean_runtime}s</span>
 
@@ -1133,7 +1225,7 @@ function HistoryView({
                 {item.scenario}
               </span>
 
-              <strong>{item.fitness}</strong>
+              <strong>{formatMetric(item.fitness)}</strong>
 
               <span>
                 {item.runtime !== null
@@ -1241,7 +1333,7 @@ function ComparisonTable({
             {item.algorithm}
           </strong>
 
-          <span>{item.best_fitness}</span>
+          <span>{formatMetric(item.best_fitness)}</span>
 
           <span>
             {Number(item.best_runtime).toFixed(6)} s
