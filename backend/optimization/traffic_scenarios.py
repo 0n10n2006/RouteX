@@ -190,7 +190,98 @@ KOTHRUD_PEAK_TRAFFIC_FACTORS = {
     "service": 0.50,
     "default": 0.55,
 }
+KOTHRUD_MEDIUM_CONGESTION_FACTORS = {
+    "primary": 0.55,
+    "secondary": 0.65,
+    "tertiary": 0.70,
+    "residential": 0.60,
+    "service": 0.60,
+    "default": 0.65,
+}
 
+KOTHRUD_HIGH_CONGESTION_FACTORS = {
+    "primary": 0.40,
+    "secondary": 0.50,
+    "tertiary": 0.55,
+    "residential": 0.45,
+    "service": 0.45,
+    "default": 0.50,
+}
+
+def create_kothrud_medium_congestion_problem():
+    """Create the Kothrud routing problem under simulated medium congestion."""
+    graph = prepare_graph(load_road_network(KOTHRUD_OSM_FILE))
+    locations = _connected_locations(graph)
+
+    matrix_data = build_route_matrix(
+        graph,
+        locations,
+        traffic_factors=KOTHRUD_MEDIUM_CONGESTION_FACTORS,
+    )
+
+    problem = ProblemInstance(
+        distance_matrix=matrix_data["distance_matrix"],
+        travel_time_matrix=matrix_data["travel_time_matrix"],
+        vehicles=[
+            {"id": 1, "capacity": 7},
+            {"id": 2, "capacity": 7},
+        ],
+        customers=[
+            {"id": 1, "demand": 2},
+            {"id": 2, "demand": 3},
+            {"id": 3, "demand": 2},
+            {"id": 4, "demand": 3},
+        ],
+        metadata={
+            **matrix_data["metadata"],
+            "scenario": "kothrud_medium_congestion",
+            "traffic_condition": "medium_congestion",
+            "source": "Kothrud OSM extract with simulated medium congestion",
+            "traffic_factors": KOTHRUD_MEDIUM_CONGESTION_FACTORS,
+            "locations": locations,
+            "incident": None,
+        },
+    )
+
+    return problem
+
+
+def create_kothrud_high_congestion_problem():
+    """Create the Kothrud routing problem under simulated high congestion."""
+    graph = prepare_graph(load_road_network(KOTHRUD_OSM_FILE))
+    locations = _connected_locations(graph)
+
+    matrix_data = build_route_matrix(
+        graph,
+        locations,
+        traffic_factors=KOTHRUD_HIGH_CONGESTION_FACTORS,
+    )
+
+    problem = ProblemInstance(
+        distance_matrix=matrix_data["distance_matrix"],
+        travel_time_matrix=matrix_data["travel_time_matrix"],
+        vehicles=[
+            {"id": 1, "capacity": 7},
+            {"id": 2, "capacity": 7},
+        ],
+        customers=[
+            {"id": 1, "demand": 2},
+            {"id": 2, "demand": 3},
+            {"id": 3, "demand": 2},
+            {"id": 4, "demand": 3},
+        ],
+        metadata={
+            **matrix_data["metadata"],
+            "scenario": "kothrud_high_congestion",
+            "traffic_condition": "high_congestion",
+            "source": "Kothrud OSM extract with simulated high congestion",
+            "traffic_factors": KOTHRUD_HIGH_CONGESTION_FACTORS,
+            "locations": locations,
+            "incident": None,
+        },
+    )
+
+    return problem
 
 def create_kothrud_peak_problem():
     """Create the Kothrud routing problem under simulated peak traffic."""

@@ -138,6 +138,7 @@ def _prepare_travel_times(graph, traffic_factors, incident_edges):
             )
 
         speed_kmh = _edge_speed(data)
+
         traffic_factor = _traffic_factor_for_edge(
             data,
             traffic_factors,
@@ -199,6 +200,7 @@ def build_route_matrix(
 
     for location in locations:
         location_id = location["id"]
+
         node_lookup[str(location_id)] = _nearest_node(
             graph,
             location,
@@ -245,6 +247,7 @@ def build_route_matrix(
                     target_node,
                     weight="travel_time",
                 )
+
             except nx.NetworkXNoPath:
                 raise ValueError(
                     f"No route exists between location "
@@ -293,13 +296,14 @@ def build_route_geometry(
     traffic_factors=None,
     incident_edges=None,
 ):
-    """Return road-following GeoJSON features for optimizer vehicle routes.
-
-    Coordinates use GeoJSON order: ``[longitude, latitude]``. Each feature is
-    one vehicle route stitched from the shortest traffic-adjusted OSM paths for
-    its route legs. This deliberately avoids drawing misleading straight lines
-    between customers.
     """
+    Return road-following GeoJSON features for optimizer vehicle routes.
+
+    Coordinates use GeoJSON order: [longitude, latitude].
+    Each feature is one vehicle route stitched from the shortest
+    traffic-adjusted OSM paths for its route legs.
+    """
+
     _validate_locations(locations)
 
     if not isinstance(routes, list):
@@ -309,20 +313,31 @@ def build_route_geometry(
         location["id"]: _nearest_node(graph, location)
         for location in locations
     }
+
     travel_graph = _prepare_travel_times(
         graph,
         traffic_factors,
         incident_edges,
     )
+
     features = []
 
     for vehicle_index, route in enumerate(routes, start=1):
         if not isinstance(route, list) or len(route) < 2:
-            raise ValueError(f"Route {vehicle_index} must contain at least two locations")
-        if any(location_id not in location_nodes for location_id in route):
-            raise ValueError(f"Route {vehicle_index} references an unknown location")
+            raise ValueError(
+                f"Route {vehicle_index} must contain at least two locations"
+            )
+
+        if any(
+            location_id not in location_nodes
+            for location_id in route
+        ):
+            raise ValueError(
+                f"Route {vehicle_index} references an unknown location"
+            )
 
         path_nodes = []
+
         for source_id, target_id in zip(route, route[1:]):
             try:
                 leg_nodes = nx.shortest_path(
@@ -331,28 +346,38 @@ def build_route_geometry(
                     location_nodes[target_id],
                     weight="travel_time",
                 )
+
             except nx.NetworkXNoPath:
                 raise ValueError(
-                    f"No route exists between location {source_id} and location {target_id}"
+                    f"No route exists between location "
+                    f"{source_id} and location {target_id}"
                 )
 
-            path_nodes.extend(leg_nodes if not path_nodes else leg_nodes[1:])
+            path_nodes.extend(
+                leg_nodes if not path_nodes else leg_nodes[1:]
+            )
 
         coordinates = [
-            [float(graph.nodes[node]["x"]), float(graph.nodes[node]["y"])]
+            [
+                float(graph.nodes[node]["x"]),
+                float(graph.nodes[node]["y"]),
+            ]
             for node in path_nodes
         ]
-        features.append({
-            "type": "Feature",
-            "properties": {
-                "vehicle_index": vehicle_index,
-                "route": route,
-            },
-            "geometry": {
-                "type": "LineString",
-                "coordinates": coordinates,
-            },
-        })
+
+        features.append(
+            {
+                "type": "Feature",
+                "properties": {
+                    "vehicle_index": vehicle_index,
+                    "route": route,
+                },
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": coordinates,
+                },
+            }
+        )
 
     return {
         "type": "FeatureCollection",
@@ -372,12 +397,17 @@ def apply_incident(graph, incident):
     factor = incident.get("factor")
 
     if not isinstance(edges, list) or not edges:
-        raise ValueError("incident.edges must be a non-empty list")
+        raise ValueError(
+            "incident.edges must be a non-empty list"
+        )
 
     try:
         factor = float(factor)
+
     except (TypeError, ValueError):
-        raise ValueError("incident factor must be numeric")
+        raise ValueError(
+            "incident factor must be numeric"
+        )
 
     if not 0 < factor <= 1:
         raise ValueError(
@@ -400,5 +430,37 @@ def apply_incident(graph, incident):
             )
 
         result[u][v][key]["incident_factor"] = factor
+
+    return result
+
+
+def close_road(graph, edges):
+    """
+    Return a copy of the graph with the specified road edges removed.
+
+    A closed road cannot be used by routing or shortest-path calculations.
+    """
+
+    if not isinstance(edges, list) or not edges:
+        raise ValueError(
+            "edges must be a non-empty list"
+        )
+
+    result = graph.copy()
+
+    for edge in edges:
+        if not isinstance(edge, (tuple, list)) or len(edge) != 3:
+            raise ValueError(
+                "Each closed edge must be (u, v, key)"
+            )
+
+        u, v, key = edge
+
+        if not result.has_edge(u, v, key):
+            raise ValueError(
+                f"Closed edge does not exist: {(u, v, key)}"
+            )
+
+        result.remove_edge(u, v, key)
 
     return result

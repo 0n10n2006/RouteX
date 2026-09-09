@@ -177,3 +177,79 @@ def test_kothrud_peak_travel_times_are_slower_than_normal():
     peak_total = sum(sum(row) for row in peak.travel_time_matrix)
 
     assert peak_total > normal_total
+
+def test_kothrud_medium_congestion_scenario():
+    from backend.optimization.traffic_scenarios import (
+        create_kothrud_medium_congestion_problem,
+    )
+
+    problem = create_kothrud_medium_congestion_problem()
+
+    assert problem.distance_matrix
+    assert problem.travel_time_matrix
+    assert problem.metadata["scenario"] == "kothrud_medium_congestion"
+    assert problem.metadata["traffic_condition"] == "medium_congestion"
+
+
+def test_kothrud_high_congestion_scenario():
+    from backend.optimization.traffic_scenarios import (
+        create_kothrud_high_congestion_problem,
+    )
+
+    problem = create_kothrud_high_congestion_problem()
+
+    assert problem.distance_matrix
+    assert problem.travel_time_matrix
+    assert problem.metadata["scenario"] == "kothrud_high_congestion"
+    assert problem.metadata["traffic_condition"] == "high_congestion"
+
+
+def test_congestion_increases_travel_time():
+    from backend.optimization.traffic_scenarios import (
+        create_kothrud_problem,
+        create_kothrud_medium_congestion_problem,
+        create_kothrud_high_congestion_problem,
+    )
+
+    normal = create_kothrud_problem()
+    medium = create_kothrud_medium_congestion_problem()
+    high = create_kothrud_high_congestion_problem()
+
+    normal_total = sum(
+        sum(row) for row in normal.travel_time_matrix
+    )
+
+    medium_total = sum(
+        sum(row) for row in medium.travel_time_matrix
+    )
+
+    high_total = sum(
+        sum(row) for row in high.travel_time_matrix
+    )
+
+    assert medium_total > normal_total
+    assert high_total > medium_total
+
+def test_kothrud_incident_increases_travel_time():
+    from backend.optimization.traffic_scenarios import (
+        create_kothrud_problem,
+        create_kothrud_problem_with_incident,
+    )
+
+    normal = create_kothrud_problem()
+
+    incident = create_kothrud_problem_with_incident(
+        incident_edge=(4704828557, 4704828553, 0),
+        incident_factor=0.25,
+    )
+
+    normal_total = sum(
+        sum(row) for row in normal.travel_time_matrix
+    )
+
+    incident_total = sum(
+        sum(row) for row in incident.travel_time_matrix
+    )
+
+    assert incident_total > normal_total
+    assert incident.metadata["incident"]["speed_factor"] == 0.25
