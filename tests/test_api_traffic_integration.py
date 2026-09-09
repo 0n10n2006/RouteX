@@ -64,3 +64,37 @@ def test_custom_scenario_accepts_and_uses_travel_time_matrix(tmp_path):
     )
     assert optimized.status_code == 200
     assert optimized.json()["travel_time"] == 110.0
+
+def test_kothrud_peak_scenario_uses_peak_traffic():
+    from backend.optimization.traffic_scenarios import (
+        create_kothrud_peak_problem,
+    )
+
+    problem = create_kothrud_peak_problem()
+
+    assert problem.distance_matrix
+    assert problem.travel_time_matrix
+    assert problem.metadata["scenario"] == "kothrud_peak"
+    assert problem.metadata["traffic_condition"] == "peak"
+
+
+def test_kothrud_peak_travel_times_are_slower_than_normal():
+    from backend.optimization.traffic_scenarios import (
+        create_kothrud_problem,
+        create_kothrud_peak_problem,
+    )
+
+    normal = create_kothrud_problem()
+    peak = create_kothrud_peak_problem()
+
+    normal_total = sum(
+        sum(row)
+        for row in normal.travel_time_matrix
+    )
+
+    peak_total = sum(
+        sum(row)
+        for row in peak.travel_time_matrix
+    )
+
+    assert peak_total > normal_total

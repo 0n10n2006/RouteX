@@ -27,6 +27,15 @@ KOTHRUD_TRAFFIC_FACTORS = {
     "default": 0.75,
 }
 
+KOTHRUD_PEAK_TRAFFIC_FACTORS = {
+    "primary": 0.45,
+    "secondary": 0.55,
+    "tertiary": 0.60,
+    "residential": 0.50,
+    "service": 0.50,
+    "default": 0.55,
+}
+
 
 def _connected_locations(graph, count=5):
     """Select deterministic, geographically spread nodes in one SCC.
@@ -148,3 +157,40 @@ def create_kothrud_problem_with_incident(incident_leg=None, incident_factor=None
         },
     )
     return problem
+
+def create_kothrud_peak_problem():
+    """Create the Kothrud routing problem under simulated peak traffic."""
+    graph = prepare_graph(load_road_network(KOTHRUD_OSM_FILE))
+    locations = _connected_locations(graph)
+
+    matrix_data = build_route_matrix(
+        graph,
+        locations,
+        traffic_factors=KOTHRUD_PEAK_TRAFFIC_FACTORS,
+    )
+
+    problem = ProblemInstance(
+        distance_matrix=matrix_data["distance_matrix"],
+        travel_time_matrix=matrix_data["travel_time_matrix"],
+        vehicles=[
+            {"id": 1, "capacity": 7},
+            {"id": 2, "capacity": 7},
+        ],
+        customers=[
+            {"id": 1, "demand": 2},
+            {"id": 2, "demand": 3},
+            {"id": 3, "demand": 2},
+            {"id": 4, "demand": 3},
+        ],
+        metadata={
+            **matrix_data["metadata"],
+            "scenario": "kothrud_peak",
+            "traffic_condition": "peak",
+            "source": "Kothrud OSM extract with simulated peak traffic",
+            "traffic_factors": KOTHRUD_PEAK_TRAFFIC_FACTORS,
+            "locations": locations,
+            "incident": None,
+        },
+    )
+    return problem
+
