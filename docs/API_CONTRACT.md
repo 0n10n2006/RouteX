@@ -70,14 +70,14 @@ Field meanings:
 | Field | Meaning |
 | --- | --- |
 | `id` | Persistent SQLite run ID. |
-| `algorithm` | Display name: `QPSO`, `Hybrid QPSO + 2-opt`, or `Greedy (classical baseline)`. |
+| `algorithm` | Display name: `GA`, `PSO`, `QPSO`, `Hybrid QPSO + 2-opt`, or `Greedy (classical baseline)`. |
 | `fitness` | Score to minimise: simulated travel time for `kothrud`, otherwise distance. |
 | `distance` | Total road distance in metres for `kothrud`; test-matrix units otherwise. |
 | `runtime` | Optimizer execution time in seconds. |
 | `scenario` | Resolved scenario name. An unknown requested name resolves safely to `default`. |
 | `routes` | One route list for each used vehicle. |
-| `convergence` | Best fitness after each QPSO iteration. Greedy returns `[]`. |
-| `iterations` | `20` for QPSO/hybrid; `0` for greedy. |
+| `convergence` | Best fitness after each QPSO/hybrid iteration. Greedy, GA, and PSO currently return `[]`. |
+| `iterations` | `50` for GA/PSO, `20` for QPSO/hybrid, and `0` for greedy. |
 | `constraint_violations` | Count of failed route checks. `0` means feasible. |
 | `vehicles_used` | Number of returned route lists. |
 | `seed` | Optional reproducibility seed; `null` when not supplied. |
@@ -95,7 +95,7 @@ Response:
 ```json
 {
   "message": "RouteX Backend is running!",
-  "algorithms": ["greedy", "qpso", "hybrid"],
+  "algorithms": ["greedy", "ga", "pso", "qpso", "hybrid"],
   "scenarios": ["default", "low", "medium", "high", "big", "kothrud"]
 }
 ```
@@ -306,14 +306,14 @@ Runs every selected algorithm × scenario × seed, saves every individual run, a
 returns both raw runs and aggregate statistics. This endpoint can take noticeable
 time; show a loading state and disable the trigger while it runs.
 
-Request body is optional. Default: `3` seeds, all five built-in scenarios, and
-all three algorithms.
+Request body is optional. Default: `3` seeds, all six built-in scenarios, and
+all five algorithms.
 
 ```json
 {
   "seeds": 3,
   "scenarios": ["big", "high"],
-  "algorithms": ["greedy", "qpso", "hybrid"]
+  "algorithms": ["greedy", "ga", "pso", "qpso", "hybrid"]
 }
 ```
 
@@ -322,10 +322,10 @@ defaults.
 
 ```json
 {
-  "total_runs": 18,
+  "total_runs": 30,
   "seeds_per_combination": 3,
   "scenarios": ["big", "high"],
-  "algorithms": ["greedy", "qpso", "hybrid"],
+  "algorithms": ["greedy", "ga", "pso", "qpso", "hybrid"],
   "total_runtime": 0.231,
   "summary": [
     {
