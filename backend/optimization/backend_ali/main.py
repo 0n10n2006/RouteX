@@ -96,7 +96,7 @@ class OptimizeRequest(BaseModel):
 class BenchmarkRequest(BaseModel):
     seeds: int = 3                   # how many seeded repeats per combination
     scenarios: list[str] | None = None   # defaults to all built-in scenarios
-    algorithms: list[str] | None = None  # defaults to all three algorithms
+    algorithms: list[str] | None = None  # defaults to all supported algorithms
 
 
 class IncidentOptimizeRequest(BaseModel):

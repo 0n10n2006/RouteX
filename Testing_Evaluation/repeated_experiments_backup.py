@@ -1,4 +1,3 @@
-
 import csv
 import random
 import time
@@ -74,14 +73,6 @@ scenarios = [
         "incident": True,
         "vehicles": 10,
         "delivery_points": 25
-    },
-    {
-        "id": "S6",
-        "demand": "High",
-        "traffic": "High",
-        "incident": "multiple",
-        "vehicles": 10,
-        "delivery_points": 25
     }
 ]
 
@@ -125,7 +116,9 @@ def create_distance_matrix(
         for j in range(num_points):
 
             if i == j:
+
                 row.append(0)
+
                 continue
 
             x1, y1 = coordinates[i]
@@ -138,26 +131,9 @@ def create_distance_matrix(
 
             distance *= factor
 
-            # Single incident
-            if incident is True:
+            if incident and (i + j) % 5 == 0:
 
-                if (i + j) % 5 == 0:
-                    distance *= 1.8
-
-            # Multiple incidents
-            elif incident == "multiple":
-
-                # Incident 1
-                if (i + j) % 5 == 0:
-                    distance *= 1.8
-
-                # Incident 2
-                if (i * j) % 7 == 0:
-                    distance *= 1.6
-
-                # Incident 3
-                if abs(i - j) == 3:
-                    distance *= 1.5
+                distance *= 1.8
 
             row.append(round(distance, 2))
 
@@ -170,10 +146,7 @@ def create_distance_matrix(
 # CREATE PROBLEM
 # ==========================================================
 
-def create_problem(
-    scenario,
-    seed
-):
+def create_problem(scenario, seed):
 
     num_customers = scenario["delivery_points"]
 
@@ -238,13 +211,7 @@ def create_problem(
     return ProblemInstance(
         distance_matrix=distance_matrix,
         vehicles=vehicles,
-        customers=customers,
-        metadata={
-            "scenario_id": scenario["id"],
-            "demand": scenario["demand"],
-            "traffic": scenario["traffic"],
-            "incident": scenario["incident"]
-        }
+        customers=customers
     )
 
 
@@ -301,6 +268,7 @@ def run_algorithm(
         if result is not None:
 
             routes = result["routes"]
+
             best_fitness = result["fitness"]
 
         iterations = 50
@@ -324,6 +292,7 @@ def run_algorithm(
         if result is not None:
 
             routes = result["routes"]
+
             best_fitness = result["fitness"]
 
         iterations = 50
@@ -358,6 +327,7 @@ def run_algorithm(
         if result is not None:
 
             routes = result["routes"]
+
             best_fitness = result["fitness"]
 
     # ------------------------------------------------------
@@ -376,13 +346,10 @@ def run_algorithm(
         if result is not None:
 
             routes = result["routes"]
+
             best_fitness = result["fitness"]
 
         iterations = 50
-
-    # ------------------------------------------------------
-    # RUNTIME
-    # ------------------------------------------------------
 
     runtime = (
         time.perf_counter()
@@ -408,6 +375,7 @@ def run_algorithm(
     else:
 
         constraint_violations = 1
+
         distance = float("inf")
 
     return {
@@ -415,7 +383,8 @@ def run_algorithm(
         "distance": distance,
         "runtime": runtime,
         "iterations": iterations,
-        "constraint_violations": constraint_violations
+        "constraint_violations":
+            constraint_violations
     }
 
 
@@ -449,21 +418,6 @@ def main():
         print(
             "Scenario:",
             scenario["id"]
-        )
-
-        print(
-            "Demand:",
-            scenario["demand"]
-        )
-
-        print(
-            "Traffic:",
-            scenario["traffic"]
-        )
-
-        print(
-            "Incident:",
-            scenario["incident"]
         )
 
         print(
@@ -501,15 +455,31 @@ def main():
                 )
 
                 results.append({
-                    "scenario_id": scenario["id"],
-                    "seed": seed,
-                    "algorithm": algorithm_name,
-                    "fitness": result["fitness"],
-                    "distance": result["distance"],
-                    "runtime": result["runtime"],
-                    "iterations": result["iterations"],
+                    "scenario_id":
+                        scenario["id"],
+
+                    "seed":
+                        seed,
+
+                    "algorithm":
+                        algorithm_name,
+
+                    "fitness":
+                        result["fitness"],
+
+                    "distance":
+                        result["distance"],
+
+                    "runtime":
+                        result["runtime"],
+
+                    "iterations":
+                        result["iterations"],
+
                     "constraint_violations":
-                        result["constraint_violations"]
+                        result[
+                            "constraint_violations"
+                        ]
                 })
 
     # ======================================================
@@ -542,6 +512,7 @@ def main():
         )
 
         writer.writeheader()
+
         writer.writerows(results)
 
     print("\n================================")
@@ -560,5 +531,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
 
+    main()

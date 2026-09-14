@@ -71,7 +71,7 @@ pivot_distance = df.pivot(
 
 pivot_distance.plot(kind="bar", figsize=(12, 6))
 
-plt.title("Mean Travel Distance Comparison")
+plt.title("Mean Fitness Comparison (Distance-Based Objective)")
 plt.xlabel("Scenario")
 plt.ylabel("Distance")
 plt.xticks(rotation=0)
