@@ -23,7 +23,8 @@ class LiveTrafficMatrixTests(unittest.TestCase):
     def test_builds_matrix_from_traffic_aware_route_summaries(self):
         payload = (
             '{"routes":[{"summary":{"lengthInMeters":1250,'
-            '"travelTimeInSeconds":180,"trafficDelayInSeconds":30}}]}'
+            '"travelTimeInSeconds":180,"trafficDelayInSeconds":30,'
+            '"noTrafficTravelTimeInSeconds":150}}]}'
         )
         locations = [
             {"latitude": 18.50, "longitude": 73.80},

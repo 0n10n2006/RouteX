@@ -10,7 +10,8 @@ data. They get replaced by real road distances once Zobiya's
 traffic/graph_builder.py can turn an OSMnx/NetworkX graph into a distance
 matrix. Everything else in this pipeline stays the same when that happens.
 """
-
+from dotenv import load_dotenv
+load_dotenv()
 import math
 import random
 import statistics

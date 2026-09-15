@@ -7,3 +7,4 @@ networkx==3.6.1
 osmnx==2.1.1
 # Required by OSMnx to find nearest road nodes on unprojected OSM graphs.
 scikit-learn==1.9.0
+python-dotenv==1.0.1
