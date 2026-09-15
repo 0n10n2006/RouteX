@@ -36,7 +36,12 @@ from ..traffic_scenarios import (
 )
 from traffic.graph_builder import build_route_geometry
 from traffic.osm_loader import load_road_network, prepare_graph
-
+from ..traffic_scenarios import (
+    create_kothrud_problem,
+    create_kothrud_problem_with_incident,
+    resolve_kothrud_incident,
+    create_larger_area_problem,   # NEW
+)
 from .database import (
     create_tables,
     save_result,
@@ -54,18 +59,23 @@ from .scenarios_ali import create_extra_scenarios
 # TUNABLE SETTINGS (Week 4 parameter tuning lives here)
 # --------------------------------------------------
 
-QPSO_PARTICLES = 10
-QPSO_ITERATIONS = 20
+QPSO_PARTICLES = 14
+QPSO_ITERATIONS = 50
+# QPSO's beta (contraction-expansion coefficient) is annealed linearly from
+# BETA_START down to BETA_END across the run: high beta early on means the
+# swarm explores broadly, low beta later means it exploits/fine-tunes. This
+# is what turns the convergence chart into a genuine multi-step decline
+# instead of jumping straight to the optimum on iteration one. Hybrid QPSO
+# keeps a single fixed beta (QPSO_BETA) since hybrid_qpso() doesn't accept
+# a schedule.
 QPSO_BETA = 0.5
-GA_POPULATION_SIZE = 20
-GA_GENERATIONS = 50
-PSO_PARTICLES = 20
-PSO_ITERATIONS = 50
+QPSO_BETA_START = 1.0
+QPSO_BETA_END = 0.2
 
 # "greedy" is the classical baseline we measure improvement against.
 BASELINE_ALGORITHM = "Greedy (classical baseline)"
 ALL_ALGORITHMS = ["greedy", "ga", "pso", "qpso", "hybrid"]
-BUILTIN_SCENARIOS = ["default", "low", "medium", "high", "big", "kothrud"]
+BUILTIN_SCENARIOS = ["default", "low", "medium", "high", "big", "kothrud", "larger_area"]
 
 app = FastAPI(
     title="RouteX API",
@@ -163,13 +173,11 @@ def default_problem():
 
 
 def builtin_problems():
-    """Every scenario defined in Python: default + team presets + Ali's 'big'."""
-
     problems = {"default": default_problem()}
-    problems.update(create_scenarios())        # low / medium / high (team)
-    problems.update(create_extra_scenarios())  # big (Ali)
-    # Real road geometry from the committed OSM extract; traffic is simulated.
+    problems.update(create_scenarios())
+    problems.update(create_extra_scenarios())
     problems["kothrud"] = create_kothrud_problem()
+    problems["larger_area"] = create_larger_area_problem()   # NEW
     return problems
 
 def problem_from_scenario_row(row):
@@ -221,6 +229,10 @@ def register_builtin_scenarios():
         "kothrud": (
             "Real Kothrud OSM road extract — 4 customers, 2 vehicles; "
             "traffic speeds are simulated"
+        ),
+        "larger_area": (
+            "Larger real OSM road extract — 8 customers, 3 vehicles; "
+            "bigger search space, traffic speeds are simulated"
         ),
     }
 
@@ -342,8 +354,13 @@ def run_algorithm(algo, problem, seed=None):
             num_particles=QPSO_PARTICLES,
             num_customers=len(problem.customers),
         )
-        for _ in range(QPSO_ITERATIONS):
-            qpso.step(problem, fitness, beta=QPSO_BETA)
+        for iteration in range(QPSO_ITERATIONS):
+            # Anneal beta from BETA_START (exploratory) to BETA_END
+            # (exploitative) so the convergence curve shows real,
+            # multi-step progress instead of flattening on iteration one.
+            progress = iteration / max(QPSO_ITERATIONS - 1, 1)
+            beta = QPSO_BETA_START - (QPSO_BETA_START - QPSO_BETA_END) * progress
+            qpso.step(problem, fitness, beta=beta)
 
         best = qpso.get_best_solution(problem)
         routes = (best.get("routes") if best else None) or []
@@ -351,7 +368,6 @@ def run_algorithm(algo, problem, seed=None):
         convergence = qpso.convergence
         iterations = QPSO_ITERATIONS
         algorithm_name = "QPSO"
-
     else:
         raise ValueError(
             "Unknown algorithm. Choose one of: " + ", ".join(ALL_ALGORITHMS)
@@ -595,21 +611,24 @@ def result_convergence(run_id: int):
 
 
 @app.get("/results/{run_id}/geometry")
+@app.get("/results/{run_id}/geometry")
 def result_geometry(run_id: int):
     """Return real OSM road geometry for each vehicle route as GeoJSON.
 
-    Only Kothrud OSM runs include the required source locations and traffic
-    metadata. Matrix-only scenarios intentionally cannot invent map geometry.
+    Only OSM-backed runs (Kothrud, the larger area extract, ...) include the
+    required source locations and OSM file. Matrix-only scenarios
+    intentionally cannot invent map geometry.
     """
     row = get_result(run_id)
     if row is None:
         raise HTTPException(status_code=404, detail=f"No run with id {run_id}")
 
     metadata = row.get("traffic_metadata") or {}
-    if metadata.get("source") != "Kothrud OSM extract with simulated traffic":
+    osm_file = metadata.get("osm_file")
+    if not osm_file or not metadata.get("locations"):
         raise HTTPException(
             status_code=422,
-            detail="Road geometry is available only for Kothrud OSM runs",
+            detail="Road geometry is available only for OSM-backed runs",
         )
 
     incident = metadata.get("incident") or {}
@@ -620,7 +639,7 @@ def result_geometry(run_id: int):
         }
 
     try:
-        graph = prepare_graph(load_road_network(KOTHRUD_OSM_FILE))
+        graph = prepare_graph(load_road_network(osm_file))
         geometry = build_route_geometry(
             graph,
             metadata["locations"],

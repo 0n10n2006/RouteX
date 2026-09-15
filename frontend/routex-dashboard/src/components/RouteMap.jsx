@@ -1,8 +1,10 @@
 import { MapContainer, TileLayer, GeoJSON, CircleMarker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
-const KOTHRUD_CENTER = [18.5095, 73.7982];
 const VEHICLE_COLOURS = ["#42d9ff", "#ff9f43", "#a78bfa", "#34d399"];
+
+// Fallback center used only if a run somehow has no locations at all.
+const DEFAULT_CENTER = [18.5095, 73.7982];
 
 function RouteMap({ geometry }) {
   if (!geometry) {
@@ -10,7 +12,7 @@ function RouteMap({ geometry }) {
       <div className="route-map-empty">
         <div>
           <strong>No route geometry available</strong>
-          <p>Run the Kothrud OSM scenario to display the optimized route.</p>
+          <p>Run an OSM-backed scenario to display the optimized route.</p>
         </div>
       </div>
     );
@@ -18,11 +20,20 @@ function RouteMap({ geometry }) {
 
   const locations = geometry.locations || [];
 
+  // Fit the map to whichever locations came back, so this works for any
+  // OSM-backed scenario (Kothrud, the larger area extract, ...) instead of
+  // being centered on one hardcoded spot.
+  const bounds =
+    locations.length > 0
+      ? locations.map((location) => [location.latitude, location.longitude])
+      : null;
+
   return (
     <div className="route-map-container">
       <MapContainer
-        center={KOTHRUD_CENTER}
-        zoom={17}
+        {...(bounds
+          ? { bounds, boundsOptions: { padding: [40, 40] } }
+          : { center: DEFAULT_CENTER, zoom: 17 })}
         scrollWheelZoom={true}
         className="route-map"
       >
