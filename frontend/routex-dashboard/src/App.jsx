@@ -14,7 +14,7 @@ import {
 import "./App.css";
 import RouteMap from "./components/RouteMap";
 
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 // Keep full numeric precision in the API/database, but make dashboard values
 // readable for users (for example, 1932.1941857651207 -> 1932.19).
