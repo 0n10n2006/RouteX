@@ -1,0 +1,12 @@
+.git
+.gitignore
+__pycache__
+*.pyc
+.venv
+venv
+
+frontend/routex-dashboard/node_modules
+frontend/routex-dashboard/dist
+
+Testing_Evaluation/graphs
+*.log
