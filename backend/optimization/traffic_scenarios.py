@@ -9,6 +9,7 @@ from pathlib import Path
 import networkx as nx
 
 from traffic.graph_builder import build_route_matrix
+from traffic.live_traffic import build_tomtom_live_matrix
 from traffic.osm_loader import load_road_network, prepare_graph
 
 from .problem import ProblemInstance
@@ -16,7 +17,7 @@ from .problem import ProblemInstance
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 KOTHRUD_OSM_FILE = PROJECT_ROOT / "data/raw/kothrud_test_area.osm"
-
+LARGER_AREA_OSM_FILE = PROJECT_ROOT / "data/raw/larger_area.osm"   # NEW
 # Speed multipliers in (0, 1]. Lower values mean slower simulated traffic.
 KOTHRUD_TRAFFIC_FACTORS = {
     "primary": 0.65,
@@ -121,6 +122,36 @@ def create_kothrud_problem():
     return _create_kothrud_problem(graph)
 
 
+def create_kothrud_live_traffic_problem():
+    """Create the Kothrud problem using a fresh live traffic route matrix."""
+    graph = prepare_graph(load_road_network(KOTHRUD_OSM_FILE))
+    locations = _connected_locations(graph)
+    matrix_data = build_tomtom_live_matrix(locations)
+
+    return ProblemInstance(
+        distance_matrix=matrix_data["distance_matrix"],
+        travel_time_matrix=matrix_data["travel_time_matrix"],
+        vehicles=[{"id": 1, "capacity": 7}, {"id": 2, "capacity": 7}],
+        customers=[
+            {"id": 1, "demand": 2},
+            {"id": 2, "demand": 3},
+            {"id": 3, "demand": 2},
+            {"id": 4, "demand": 3},
+        ],
+        metadata={
+            **matrix_data["metadata"],
+            "locations": locations,
+            "osm_file": str(KOTHRUD_OSM_FILE),
+            "road_geometry": "Kothrud OSM extract",
+            "geometry_note": (
+                "The displayed route uses local OSM geometry; optimization "
+                "uses TomTom's live traffic-aware matrix."
+            ),
+            "incident": None,
+        },
+    )
+
+
 def _create_kothrud_problem(graph, incident_edges=None, incident_metadata=None):
     locations = _connected_locations(graph)
 
@@ -147,6 +178,7 @@ def _create_kothrud_problem(graph, incident_edges=None, incident_metadata=None):
         metadata={
             **matrix_data["metadata"],
             "source": "Kothrud OSM extract with simulated traffic",
+            "osm_file": str(KOTHRUD_OSM_FILE),   # NEW
             "traffic_factors": KOTHRUD_TRAFFIC_FACTORS,
             "locations": locations,
             "incident": incident_metadata,
@@ -318,4 +350,68 @@ def create_kothrud_peak_problem():
         },
     )
 
+    return problem
+# --------------------------------------------------
+# LARGER AREA OSM SCENARIO
+#
+# A bigger committed OSM extract than the Kothrud test area, with more
+# depot/customer locations. The wider road network and larger customer
+# count give the optimizers a genuinely bigger search space, so QPSO's
+# convergence curve actually improves over several iterations instead of
+# jumping straight to the optimum on the very first one (which is what
+# happens on the tiny 4-customer scenarios).
+# --------------------------------------------------
+
+LARGER_AREA_TRAFFIC_FACTORS = {
+    "primary": 0.65,
+    "secondary": 0.75,
+    "tertiary": 0.80,
+    "residential": 0.70,
+    "service": 0.70,
+    "default": 0.75,
+}
+
+# Depot + 8 customers (vs Kothrud's depot + 4) to widen the search space.
+LARGER_AREA_LOCATION_COUNT = 9
+
+
+def create_larger_area_problem():
+    """Create the built-in real-road / simulated-traffic problem for the
+    larger committed OSM extract."""
+    graph = prepare_graph(load_road_network(LARGER_AREA_OSM_FILE))
+    locations = _connected_locations(graph, count=LARGER_AREA_LOCATION_COUNT)
+
+    matrix_data = build_route_matrix(
+        graph,
+        locations,
+        traffic_factors=LARGER_AREA_TRAFFIC_FACTORS,
+    )
+
+    problem = ProblemInstance(
+        distance_matrix=matrix_data["distance_matrix"],
+        travel_time_matrix=matrix_data["travel_time_matrix"],
+        vehicles=[
+            {"id": 1, "capacity": 10},
+            {"id": 2, "capacity": 10},
+            {"id": 3, "capacity": 10},
+        ],
+        customers=[
+            {"id": 1, "demand": 3},
+            {"id": 2, "demand": 2},
+            {"id": 3, "demand": 4},
+            {"id": 4, "demand": 2},
+            {"id": 5, "demand": 3},
+            {"id": 6, "demand": 2},
+            {"id": 7, "demand": 3},
+            {"id": 8, "demand": 4},
+        ],
+        metadata={
+            **matrix_data["metadata"],
+            "source": "Larger area OSM extract with simulated traffic",
+            "osm_file": str(LARGER_AREA_OSM_FILE),
+            "traffic_factors": LARGER_AREA_TRAFFIC_FACTORS,
+            "locations": locations,
+            "incident": None,
+        },
+    )
     return problem

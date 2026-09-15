@@ -14,7 +14,7 @@ import {
 import "./App.css";
 import RouteMap from "./components/RouteMap";
 
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 // Keep full numeric precision in the API/database, but make dashboard values
 // readable for users (for example, 1932.1941857651207 -> 1932.19).
@@ -23,10 +23,14 @@ const formatMetric = (value, digits = 2) => {
   return Number.isFinite(number) ? number.toFixed(digits) : "—";
 };
 
-const isKothrudRun = (run) =>
-  run?.traffic_metadata?.source ===
-  "Kothrud OSM extract with simulated traffic";
-
+// True for any run backed by real OSM road geometry (Kothrud, the larger
+// area extract, ...) rather than one specific scenario's source string, so
+// new OSM-backed scenarios automatically get the route map too.
+const isOsmRun = (run) => Boolean(run?.traffic_metadata?.locations);
+const convergenceYDomain = [
+  (dataMin) => Math.floor(dataMin - Math.max(Math.abs(dataMin) * 0.01, 1)),
+  (dataMax) => Math.ceil(dataMax + Math.max(Math.abs(dataMax) * 0.01, 1)),
+];
 function App() {
   const [algorithm, setAlgorithm] = useState("qpso");
   const [scenario, setScenario] = useState("medium");
@@ -75,8 +79,13 @@ function App() {
   };
 
   useEffect(() => {
-    loadComparison();
-    loadHistory();
+    // Defer the initial fetch until after this effect completes. The loaders
+    // toggle their loading state, so invoking them synchronously here causes
+    // an avoidable cascading render.
+    queueMicrotask(() => {
+      void loadComparison();
+      void loadHistory();
+    });
   }, []);
 
 const runOptimization = async () => {
@@ -95,8 +104,8 @@ const runOptimization = async () => {
     setResult(optimizationResult);
     setActiveView("optimization");
 
-    // Fetch road geometry for Kothrud scenario
-    if (isKothrudRun(optimizationResult) && optimizationResult.run_id) {
+    // Fetch road geometry for OSM-backed scenarios
+    if (isOsmRun(optimizationResult) && optimizationResult.run_id) {
       try {
         console.log(
           "Fetching geometry for run:",
@@ -128,7 +137,8 @@ const runOptimization = async () => {
     console.error(err);
 
     setError(
-      "Could not connect to RouteX backend. Make sure FastAPI is running."
+      err.response?.data?.detail ||
+        "Could not connect to RouteX backend. Make sure FastAPI is running."
     );
   } finally {
     setLoading(false);
@@ -154,7 +164,8 @@ const runOptimization = async () => {
     } catch (err) {
       console.error(err);
       setError(
-        "Could not run algorithm comparison. Make sure FastAPI is running."
+        err.response?.data?.detail ||
+          "Could not run algorithm comparison. Make sure FastAPI is running."
       );
     } finally {
       setBenchmarkLoading(false);
@@ -171,7 +182,7 @@ const runOptimization = async () => {
     } catch (err) {
       console.error(err);
       setRouteGeometry(null);
-      console.error("Route geometry is available only for Kothrud OSM runs.");
+      console.error("Route geometry is available only for OSM-backed runs.");
     }
   };
 
@@ -184,7 +195,7 @@ const runOptimization = async () => {
 
       setResult(response.data);
 
-        if (isKothrudRun(response.data)) {
+        if (isOsmRun(response.data)) {
           await loadRouteGeometry(response.data.id);
         } else {
           setRouteGeometry(null);
@@ -454,6 +465,8 @@ function DashboardView({
               ["high", "High Traffic"],
               ["big", "Large Scenario"],
               ["kothrud", "Kothrud OSM (simulated traffic)"],
+              ["larger_area", "Larger Area OSM (simulated traffic)"],
+              ["kothrud_live", "Kothrud OSM (live traffic — TomTom)"],
             ]}
           />
 
@@ -594,6 +607,9 @@ function DashboardView({
                     tick={{ fill: "#7182a5", fontSize: 10 }}
                   />
                   <YAxis
+                    domain={convergenceYDomain}
+                    allowDecimals={false}
+                    tickFormatter={(value) => Math.round(value).toLocaleString()}
                     tick={{ fill: "#7182a5", fontSize: 10 }}
                   />
                   <Tooltip
@@ -737,6 +753,8 @@ function OptimizationView({
               ["high", "High Traffic"],
               ["big", "Large Scenario"],
               ["kothrud", "Kothrud OSM (simulated traffic)"],
+              ["larger_area", "Larger Area OSM (simulated traffic)"],
+              ["kothrud_live", "Kothrud OSM (live traffic — TomTom)"],
             ]}
           />
 
@@ -860,19 +878,22 @@ function OptimizationView({
           </section>
 
           {/* ROUTE MAP */}
-          {isKothrudRun(result) && routeGeometry && (
+          {isOsmRun(result) && routeGeometry && (
             <section className="panel route-map-panel">
               <div className="panel-heading">
                 <div>
                   <span className="micro-label">LIVE ROAD NETWORK</span>
                   <h2>Optimized Route Map</h2>
                   <p>
-                    Real OpenStreetMap road geometry for the Kothrud scenario.
+                    Real OpenStreetMap road geometry for the {result.scenario}{" "}
+                    scenario.
                   </p>
                 </div>
 
                 <span className="status-badge success">
-                  OSM ROUTE
+                  {result.traffic_metadata?.traffic_provider
+                    ? "LIVE TRAFFIC"
+                    : "OSM ROUTE"}
                 </span>
               </div>
 
@@ -908,6 +929,9 @@ function OptimizationView({
                   />
 
                   <YAxis
+                    domain={convergenceYDomain}
+                    allowDecimals={false}
+                    tickFormatter={(value) => Math.round(value).toLocaleString()}
                     tick={{ fill: "#7182a5", fontSize: 11 }}
                     axisLine={{ stroke: "#304065" }}
                   />
@@ -976,6 +1000,8 @@ function ComparisonView({
             <option value="high">High Traffic</option>
             <option value="big">Large Scenario</option>
             <option value="kothrud">Kothrud OSM (simulated traffic)</option>
+            <option value="larger_area">Larger Area OSM (simulated traffic)</option>
+            <option value="kothrud_live">Kothrud OSM (live traffic — TomTom)</option>
           </select>
         </div>
 
