@@ -1,3 +1,5 @@
+import random
+
 from .local_search import two_opt
 from .qpso import QPSO
 from .fitness import fitness
@@ -8,22 +10,20 @@ def hybrid_qpso(
     problem,
     num_particles=10,
     iterations=20,
-    beta=0.5
+    beta=0.5,
+    local_search_probability=1.0
 ):
     """
     Adaptive Hybrid QPSO + 2-opt.
 
     QPSO performs the global search.
-    2-opt is triggered whenever QPSO discovers
-    a new global best solution.
+    2-opt is considered whenever QPSO discovers
+    a new global best solution and is applied
+    according to the local search probability.
 
     The locally improved solution is kept externally
     as the best hybrid solution, but is NOT injected
     back into the QPSO swarm.
-
-    This architecture was selected after Week 4
-    ablation experiments showed that feedback injection
-    consistently underperformed plain QPSO + 2-opt.
     """
 
     qpso = QPSO(
@@ -53,35 +53,37 @@ def hybrid_qpso(
         # discovers a new global best.
         if current_qpso_best < previous_qpso_best:
 
-            qpso_result = qpso.get_best_solution(problem)
+            if random.random() < local_search_probability:
 
-            if qpso_result is not None:
+                qpso_result = qpso.get_best_solution(problem)
 
-                candidate_routes = qpso_result["routes"]
-                candidate_score = qpso_result["fitness"]
+                if qpso_result is not None:
 
-                improved_routes, improved_score = two_opt(
-                    candidate_routes,
-                    problem,
-                    fitness
-                )
+                    candidate_routes = qpso_result["routes"]
+                    candidate_score = qpso_result["fitness"]
 
-                local_search_count += 1
+                    improved_routes, improved_score = two_opt(
+                        candidate_routes,
+                        problem,
+                        fitness
+                    )
 
-                # Never allow 2-opt to worsen the solution.
-                if improved_score > candidate_score:
-                    improved_routes = candidate_routes
-                    improved_score = candidate_score
+                    local_search_count += 1
 
-                # Keep the best hybrid solution found so far.
-                if improved_score < best_score:
+                    # Never allow 2-opt to worsen the solution.
+                    if improved_score > candidate_score:
+                        improved_routes = candidate_routes
+                        improved_score = candidate_score
 
-                    best_routes = [
-                        route[:]
-                        for route in improved_routes
-                    ]
+                    # Keep the best hybrid solution found so far.
+                    if improved_score < best_score:
 
-                    best_score = improved_score
+                        best_routes = [
+                            route[:]
+                            for route in improved_routes
+                        ]
+
+                        best_score = improved_score
 
             previous_qpso_best = current_qpso_best
 
@@ -144,9 +146,10 @@ if __name__ == "__main__":
 
     result = hybrid_qpso(
         problem,
-        num_particles=5,
+        num_particles=10,
         iterations=20,
-        beta=0.5
+        beta=0.5,
+        local_search_probability=1.0
     )
 
     print("\n## Adaptive Hybrid QPSO + 2-opt Result")
