@@ -58,6 +58,10 @@ from .scenarios_ali import create_extra_scenarios
 
 QPSO_PARTICLES = 14
 QPSO_ITERATIONS = 50
+GA_POPULATION_SIZE = 20
+GA_GENERATIONS = 50
+PSO_PARTICLES = 20
+PSO_ITERATIONS = 50
 # QPSO's beta (contraction-expansion coefficient) is annealed linearly from
 # BETA_START down to BETA_END across the run: high beta early on means the
 # swarm explores broadly, low beta later means it exploits/fine-tunes. This
@@ -84,7 +88,7 @@ app = FastAPI(
 # Allow the frontend (running on a different port) to call this API.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],      # any origin — fine for local hackathon dev
+    allow_origins=["*"],      # any origin â€” fine for local hackathon dev
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -223,16 +227,16 @@ def register_builtin_scenarios():
 
     descriptions = {
         "default": "Original 5-node smoke-test problem (4 customers, 2 vehicles)",
-        "low": "Team preset — same road, low customer demand",
-        "medium": "Team preset — same road, medium customer demand",
-        "high": "Team preset — same road, high customer demand",
-        "big": "Harder benchmark — 6 customers, 3 vehicles, capacity binds",
+        "low": "Team preset â€” same road, low customer demand",
+        "medium": "Team preset â€” same road, medium customer demand",
+        "high": "Team preset â€” same road, high customer demand",
+        "big": "Harder benchmark â€” 6 customers, 3 vehicles, capacity binds",
         "kothrud": (
-            "Real Kothrud OSM road extract — 4 customers, 2 vehicles; "
+            "Real Kothrud OSM road extract â€” 4 customers, 2 vehicles; "
             "traffic speeds are simulated"
         ),
         "larger_area": (
-            "Larger real OSM road extract — 8 customers, 3 vehicles; "
+            "Larger real OSM road extract â€” 8 customers, 3 vehicles; "
             "bigger search space, traffic speeds are simulated"
         ),
     }
@@ -260,7 +264,7 @@ register_builtin_scenarios()
 def count_violations(routes, problem):
     """How many of the three constraint rules this solution breaks.
 
-    Uses Palak's checks from constraints.py — we only call them, never change
+    Uses Palak's checks from constraints.py â€” we only call them, never change
     them. Each check is guarded because a malformed route list (for example
     more routes than vehicles) would otherwise raise and kill the request."""
 
@@ -350,7 +354,7 @@ def run_algorithm(algo, problem, seed=None):
         algorithm_name = "Hybrid QPSO + 2-opt"
 
     elif algo == "qpso":
-        # Quantum-inspired QPSO — the technical centrepiece.
+        # Quantum-inspired QPSO â€” the technical centrepiece.
         qpso = QPSO(
             num_particles=QPSO_PARTICLES,
             num_customers=len(problem.customers),
@@ -583,7 +587,7 @@ def results_comparison():
 
 @app.get("/results/{run_id}")
 def result_detail(run_id: int):
-    """One saved run, including its routes — this is what draws the map."""
+    """One saved run, including its routes â€” this is what draws the map."""
 
     row = get_result(run_id)
     if row is None:
@@ -598,7 +602,7 @@ def result_detail(run_id: int):
 
 @app.get("/results/{run_id}/convergence")
 def result_convergence(run_id: int):
-    """The convergence curve of one run — this is what draws the chart."""
+    """The convergence curve of one run â€” this is what draws the chart."""
 
     row = get_result(run_id)
     if row is None:
