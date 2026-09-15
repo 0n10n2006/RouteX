@@ -19,6 +19,16 @@ This folder contains the optimization and benchmarking components for RouteX.
 - `scenarios.py` — Test scenario generation.
 - `plot_convergence.py` — QPSO convergence visualization.
 
+## Live traffic (optional)
+
+The `kothrud_live` API scenario builds its distance and travel-time matrix
+from TomTom's traffic-aware routing service at request time. Create a local
+`.env` file from `.env.example`, set `TOMTOM_API_KEY`, and export it before
+starting FastAPI (for example: `set -a; source .env; set +a`). The key stays
+server-side and is never returned to the dashboard. Without it, `POST
+/optimize` with `scenario: "kothrud_live"` returns a clear `503`; the normal
+`kothrud` scenario remains available with deterministic simulated traffic.
+
 ## Optimization Pipeline
 
 ```text

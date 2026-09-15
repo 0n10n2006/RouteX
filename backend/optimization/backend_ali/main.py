@@ -31,17 +31,14 @@ from ..constraints import check_customer_visits, check_depot, check_capacity
 from ..traffic_scenarios import (
     KOTHRUD_OSM_FILE,
     create_kothrud_problem,
+    create_kothrud_live_traffic_problem,
     create_kothrud_problem_with_incident,
     resolve_kothrud_incident,
+    create_larger_area_problem,
 )
+from traffic.live_traffic import LiveTrafficError
 from traffic.graph_builder import build_route_geometry
 from traffic.osm_loader import load_road_network, prepare_graph
-from ..traffic_scenarios import (
-    create_kothrud_problem,
-    create_kothrud_problem_with_incident,
-    resolve_kothrud_incident,
-    create_larger_area_problem,   # NEW
-)
 from .database import (
     create_tables,
     save_result,
@@ -76,6 +73,7 @@ QPSO_BETA_END = 0.2
 BASELINE_ALGORITHM = "Greedy (classical baseline)"
 ALL_ALGORITHMS = ["greedy", "ga", "pso", "qpso", "hybrid"]
 BUILTIN_SCENARIOS = ["default", "low", "medium", "high", "big", "kothrud", "larger_area"]
+LIVE_TRAFFIC_SCENARIO = "kothrud_live"
 
 app = FastAPI(
     title="RouteX API",
@@ -202,6 +200,9 @@ def build_problem(scenario_name):
     Returns (resolved_name, problem)."""
 
     scenario_name = (scenario_name or "").lower().strip()
+
+    if scenario_name == LIVE_TRAFFIC_SCENARIO:
+        return scenario_name, create_kothrud_live_traffic_problem()
 
     problems = builtin_problems()
     if scenario_name in problems:
@@ -445,6 +446,7 @@ def home():
         "message": "RouteX Backend is running!",
         "algorithms": ALL_ALGORITHMS,
         "scenarios": BUILTIN_SCENARIOS,
+        "live_traffic_scenario": LIVE_TRAFFIC_SCENARIO,
     }
 
 
@@ -456,7 +458,10 @@ def home():
 def optimize(request: OptimizeRequest):
     """Run one algorithm on one scenario, save it, and return the result."""
 
-    scenario_name, problem = build_problem(request.scenario)
+    try:
+        scenario_name, problem = build_problem(request.scenario)
+    except LiveTrafficError as error:
+        raise HTTPException(status_code=503, detail=str(error))
 
     try:
         return run_and_save(
@@ -610,7 +615,6 @@ def result_convergence(run_id: int):
     }
 
 
-@app.get("/results/{run_id}/geometry")
 @app.get("/results/{run_id}/geometry")
 def result_geometry(run_id: int):
     """Return real OSM road geometry for each vehicle route as GeoJSON.
@@ -816,6 +820,14 @@ def benchmark(request: BenchmarkRequest | None = None):
     # Cap the work so a stray request can't hang the server.
     seeds = max(1, min(request.seeds, 10))
     scenario_names = request.scenarios or BUILTIN_SCENARIOS
+    if LIVE_TRAFFIC_SCENARIO in scenario_names:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "kothrud_live is a point-in-time traffic snapshot and cannot "
+                "be benchmarked reproducibly. Run it through POST /optimize."
+            ),
+        )
     algorithms = [
         (algorithm or "").lower().strip()
         for algorithm in (request.algorithms or ALL_ALGORITHMS)

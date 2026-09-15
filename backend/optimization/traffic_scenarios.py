@@ -9,6 +9,7 @@ from pathlib import Path
 import networkx as nx
 
 from traffic.graph_builder import build_route_matrix
+from traffic.live_traffic import build_tomtom_live_matrix
 from traffic.osm_loader import load_road_network, prepare_graph
 
 from .problem import ProblemInstance
@@ -119,6 +120,36 @@ def create_kothrud_problem():
     """Create the built-in real-road / simulated-traffic demo problem."""
     graph = prepare_graph(load_road_network(KOTHRUD_OSM_FILE))
     return _create_kothrud_problem(graph)
+
+
+def create_kothrud_live_traffic_problem():
+    """Create the Kothrud problem using a fresh live traffic route matrix."""
+    graph = prepare_graph(load_road_network(KOTHRUD_OSM_FILE))
+    locations = _connected_locations(graph)
+    matrix_data = build_tomtom_live_matrix(locations)
+
+    return ProblemInstance(
+        distance_matrix=matrix_data["distance_matrix"],
+        travel_time_matrix=matrix_data["travel_time_matrix"],
+        vehicles=[{"id": 1, "capacity": 7}, {"id": 2, "capacity": 7}],
+        customers=[
+            {"id": 1, "demand": 2},
+            {"id": 2, "demand": 3},
+            {"id": 3, "demand": 2},
+            {"id": 4, "demand": 3},
+        ],
+        metadata={
+            **matrix_data["metadata"],
+            "locations": locations,
+            "osm_file": str(KOTHRUD_OSM_FILE),
+            "road_geometry": "Kothrud OSM extract",
+            "geometry_note": (
+                "The displayed route uses local OSM geometry; optimization "
+                "uses TomTom's live traffic-aware matrix."
+            ),
+            "incident": None,
+        },
+    )
 
 
 def _create_kothrud_problem(graph, incident_edges=None, incident_metadata=None):
@@ -320,7 +351,6 @@ def create_kothrud_peak_problem():
     )
 
     return problem
-
 # --------------------------------------------------
 # LARGER AREA OSM SCENARIO
 #

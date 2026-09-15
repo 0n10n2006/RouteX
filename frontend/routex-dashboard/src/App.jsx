@@ -14,7 +14,7 @@ import {
 import "./App.css";
 import RouteMap from "./components/RouteMap";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 // Keep full numeric precision in the API/database, but make dashboard values
 // readable for users (for example, 1932.1941857651207 -> 1932.19).
@@ -79,8 +79,13 @@ function App() {
   };
 
   useEffect(() => {
-    loadComparison();
-    loadHistory();
+    // Defer the initial fetch until after this effect completes. The loaders
+    // toggle their loading state, so invoking them synchronously here causes
+    // an avoidable cascading render.
+    queueMicrotask(() => {
+      void loadComparison();
+      void loadHistory();
+    });
   }, []);
 
 const runOptimization = async () => {
@@ -132,7 +137,8 @@ const runOptimization = async () => {
     console.error(err);
 
     setError(
-      "Could not connect to RouteX backend. Make sure FastAPI is running."
+      err.response?.data?.detail ||
+        "Could not connect to RouteX backend. Make sure FastAPI is running."
     );
   } finally {
     setLoading(false);
@@ -158,7 +164,8 @@ const runOptimization = async () => {
     } catch (err) {
       console.error(err);
       setError(
-        "Could not run algorithm comparison. Make sure FastAPI is running."
+        err.response?.data?.detail ||
+          "Could not run algorithm comparison. Make sure FastAPI is running."
       );
     } finally {
       setBenchmarkLoading(false);
@@ -459,6 +466,7 @@ function DashboardView({
               ["big", "Large Scenario"],
               ["kothrud", "Kothrud OSM (simulated traffic)"],
               ["larger_area", "Larger Area OSM (simulated traffic)"],
+              ["kothrud_live", "Kothrud OSM (live traffic — TomTom)"],
             ]}
           />
 
@@ -746,6 +754,7 @@ function OptimizationView({
               ["big", "Large Scenario"],
               ["kothrud", "Kothrud OSM (simulated traffic)"],
               ["larger_area", "Larger Area OSM (simulated traffic)"],
+              ["kothrud_live", "Kothrud OSM (live traffic — TomTom)"],
             ]}
           />
 
@@ -882,7 +891,9 @@ function OptimizationView({
                 </div>
 
                 <span className="status-badge success">
-                  OSM ROUTE
+                  {result.traffic_metadata?.traffic_provider
+                    ? "LIVE TRAFFIC"
+                    : "OSM ROUTE"}
                 </span>
               </div>
 
@@ -990,6 +1001,7 @@ function ComparisonView({
             <option value="big">Large Scenario</option>
             <option value="kothrud">Kothrud OSM (simulated traffic)</option>
             <option value="larger_area">Larger Area OSM (simulated traffic)</option>
+            <option value="kothrud_live">Kothrud OSM (live traffic — TomTom)</option>
           </select>
         </div>
 
