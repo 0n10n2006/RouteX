@@ -10,8 +10,13 @@ data. They get replaced by real road distances once Zobiya's
 traffic/graph_builder.py can turn an OSMnx/NetworkX graph into a distance
 matrix. Everything else in this pipeline stays the same when that happens.
 """
-from dotenv import load_dotenv
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+except ImportError:  # Optional for deployments that inject environment variables.
+    load_dotenv = None
+
+if load_dotenv is not None:
+    load_dotenv()
 import math
 import random
 import statistics
@@ -59,6 +64,10 @@ from .scenarios_ali import create_extra_scenarios
 
 QPSO_PARTICLES = 14
 QPSO_ITERATIONS = 50
+GA_POPULATION_SIZE = 20
+GA_GENERATIONS = 50
+PSO_PARTICLES = 20
+PSO_ITERATIONS = 50
 # QPSO's beta (contraction-expansion coefficient) is annealed linearly from
 # BETA_START down to BETA_END across the run: high beta early on means the
 # swarm explores broadly, low beta later means it exploits/fine-tunes. This
