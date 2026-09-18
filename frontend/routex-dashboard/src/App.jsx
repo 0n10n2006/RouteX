@@ -36,6 +36,7 @@ function App() {
   const [scenario, setScenario] = useState("medium");
 
   const [result, setResult] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
   const [routeGeometry, setRouteGeometry] = useState(null);
   const [comparison, setComparison] = useState([]);
   const [history, setHistory] = useState([]);
@@ -102,7 +103,9 @@ const runOptimization = async () => {
     const optimizationResult = response.data;
 
     setResult(optimizationResult);
+    setLastUpdated(new Date());
     setActiveView("optimization");
+    
 
     // Fetch road geometry for OSM-backed scenarios
     if (isOsmRun(optimizationResult) && optimizationResult.run_id) {
@@ -359,6 +362,7 @@ const runOptimization = async () => {
           {activeView === "optimization" && (
             <OptimizationView
               result={result}
+              lastUpdated={lastUpdated}
               routeGeometry={routeGeometry}
               loading={loading}
               algorithm={algorithm}
@@ -543,6 +547,11 @@ function DashboardView({
               <div>
                 <span className="micro-label">LATEST RESULT</span>
                 <h2>Optimization Result</h2>
+                {lastUpdated && (
+                  <div className="last-updated">
+                  Last updated: {lastUpdated.toLocaleTimeString()}
+                  </div>
+                )}
               </div>
 
               <span
@@ -704,6 +713,7 @@ function DashboardView({
 
 function OptimizationView({
   result,
+  lastUpdated,
   routeGeometry,
   loading,
   algorithm,
@@ -721,6 +731,12 @@ function OptimizationView({
         title="Optimization"
         subtitle="Configure and execute intelligent vehicle routing."
       />
+
+{lastUpdated && (
+  <div className="last-updated">
+    Last updated: {lastUpdated.toLocaleTimeString()}
+  </div>
+)}
 
       <section className="panel control-panel">
         <div className="panel-heading">

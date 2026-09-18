@@ -2358,3 +2358,10 @@ button:disabled {
 .route-location-label::before {
   border-top-color: white !important;
 }
+
+.last-updated {
+  margin: 12px 0 18px;
+  color: #7182a5;
+  font-size: 13px;
+  font-weight: 500;
+}
