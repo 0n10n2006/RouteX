@@ -357,7 +357,7 @@ const runOptimization = async () => {
 
           {/* OPTIMIZATION */}
           {activeView === "optimization" && (
-            <OptimizationView 
+            <OptimizationView
               result={result}
               routeGeometry={routeGeometry}
               loading={loading}
@@ -606,12 +606,14 @@ function DashboardView({
                     dataKey="iteration"
                     tick={{ fill: "#7182a5", fontSize: 10 }}
                   />
+
                   <YAxis
                     domain={convergenceYDomain}
                     allowDecimals={false}
                     tickFormatter={(value) => Math.round(value).toLocaleString()}
                     tick={{ fill: "#7182a5", fontSize: 10 }}
                   />
+
                   <Tooltip
                     contentStyle={{
                       background: "#111a31",
@@ -710,6 +712,7 @@ function OptimizationView({
   setScenario,
   runOptimization,
   convergenceData,
+  convergenceDomain,
 }) {
   return (
     <div className="view">
@@ -932,8 +935,7 @@ function OptimizationView({
                     domain={convergenceYDomain}
                     allowDecimals={false}
                     tickFormatter={(value) => Math.round(value).toLocaleString()}
-                    tick={{ fill: "#7182a5", fontSize: 11 }}
-                    axisLine={{ stroke: "#304065" }}
+                    tick={{ fill: "#7182a5", fontSize: 10 }}
                   />
 
                   <Tooltip
