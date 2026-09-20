@@ -10,7 +10,7 @@ import networkx as nx
 
 from traffic.graph_builder import build_route_matrix
 from traffic.live_traffic import build_tomtom_live_matrix
-from traffic.osm_loader import load_road_network, prepare_graph
+from traffic.osm_loader import load_prepared_road_network
 
 from .problem import ProblemInstance
 
@@ -118,13 +118,13 @@ def _connected_locations(graph, count=5):
 
 def create_kothrud_problem():
     """Create the built-in real-road / simulated-traffic demo problem."""
-    graph = prepare_graph(load_road_network(KOTHRUD_OSM_FILE))
+    graph = load_prepared_road_network(KOTHRUD_OSM_FILE)
     return _create_kothrud_problem(graph)
 
 
 def create_kothrud_live_traffic_problem():
     """Create the Kothrud problem using a fresh live traffic route matrix."""
-    graph = prepare_graph(load_road_network(KOTHRUD_OSM_FILE))
+    graph = load_prepared_road_network(KOTHRUD_OSM_FILE)
     locations = _connected_locations(graph)
     matrix_data = build_tomtom_live_matrix(locations)
 
@@ -197,7 +197,7 @@ def create_kothrud_problem_with_incident(
     if not 0 < float(incident_factor) <= 1:
         raise ValueError("incident_factor must satisfy 0 < factor <= 1")
 
-    graph = prepare_graph(load_road_network(KOTHRUD_OSM_FILE))
+    graph = load_prepared_road_network(KOTHRUD_OSM_FILE)
     affected_edge = tuple(incident_edge)
     if not graph.has_edge(*affected_edge):
         raise ValueError(f"Incident edge does not exist in Kothrud graph: {affected_edge}")
@@ -242,7 +242,7 @@ KOTHRUD_HIGH_CONGESTION_FACTORS = {
 
 def create_kothrud_medium_congestion_problem():
     """Create the Kothrud routing problem under simulated medium congestion."""
-    graph = prepare_graph(load_road_network(KOTHRUD_OSM_FILE))
+    graph = load_prepared_road_network(KOTHRUD_OSM_FILE)
     locations = _connected_locations(graph)
 
     matrix_data = build_route_matrix(
@@ -280,7 +280,7 @@ def create_kothrud_medium_congestion_problem():
 
 def create_kothrud_high_congestion_problem():
     """Create the Kothrud routing problem under simulated high congestion."""
-    graph = prepare_graph(load_road_network(KOTHRUD_OSM_FILE))
+    graph = load_prepared_road_network(KOTHRUD_OSM_FILE)
     locations = _connected_locations(graph)
 
     matrix_data = build_route_matrix(
@@ -317,7 +317,7 @@ def create_kothrud_high_congestion_problem():
 
 def create_kothrud_peak_problem():
     """Create the Kothrud routing problem under simulated peak traffic."""
-    graph = prepare_graph(load_road_network(KOTHRUD_OSM_FILE))
+    graph = load_prepared_road_network(KOTHRUD_OSM_FILE)
     locations = _connected_locations(graph)
 
     matrix_data = build_route_matrix(
@@ -378,7 +378,7 @@ LARGER_AREA_LOCATION_COUNT = 9
 def create_larger_area_problem():
     """Create the built-in real-road / simulated-traffic problem for the
     larger committed OSM extract."""
-    graph = prepare_graph(load_road_network(LARGER_AREA_OSM_FILE))
+    graph = load_prepared_road_network(LARGER_AREA_OSM_FILE)
     locations = _connected_locations(graph, count=LARGER_AREA_LOCATION_COUNT)
 
     matrix_data = build_route_matrix(

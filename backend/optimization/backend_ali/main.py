@@ -21,6 +21,7 @@ import math
 import random
 import statistics
 import time
+from functools import lru_cache
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -44,7 +45,7 @@ from ..traffic_scenarios import (
 )
 from traffic.live_traffic import LiveTrafficError
 from traffic.graph_builder import build_route_geometry
-from traffic.osm_loader import load_road_network, prepare_graph
+from traffic.osm_loader import load_prepared_road_network
 from .database import (
     create_tables,
     save_result,
@@ -180,7 +181,9 @@ def default_problem():
     )
 
 
+@lru_cache(maxsize=1)
 def builtin_problems():
+    """Build built-in problems once, then reuse them for every request."""
     problems = {"default": default_problem()}
     problems.update(create_scenarios())
     problems.update(create_extra_scenarios())
@@ -653,7 +656,7 @@ def result_geometry(run_id: int):
         }
 
     try:
-        graph = prepare_graph(load_road_network(osm_file))
+        graph = load_prepared_road_network(osm_file)
         geometry = build_route_geometry(
             graph,
             metadata["locations"],
