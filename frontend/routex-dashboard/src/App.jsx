@@ -197,14 +197,15 @@ const runOptimization = async () => {
       const response = await axios.get(`${API_URL}/results/${runId}`);
 
       setResult(response.data);
+      setLastUpdated(new Date());
 
-        if (isOsmRun(response.data)) {
-          await loadRouteGeometry(response.data.id);
-        } else {
-          setRouteGeometry(null);
-        }
+      if (isOsmRun(response.data)) {
+        await loadRouteGeometry(response.data.id);
+      } else {
+        setRouteGeometry(null);
+      }
 
-        setActiveView("optimization");
+      setActiveView("optimization");
 
     } catch (err) {
       console.error(err);
@@ -343,6 +344,7 @@ const runOptimization = async () => {
           {activeView === "dashboard" && (
             <DashboardView
               result={result}
+              lastUpdated={lastUpdated}
               history={history}
               comparison={scenarioComparison}
               loading={loading}
@@ -410,6 +412,7 @@ const runOptimization = async () => {
 
 function DashboardView({
   result,
+  lastUpdated,
   history,
   comparison,
   loading,
@@ -549,7 +552,7 @@ function DashboardView({
                 <h2>Optimization Result</h2>
                 {lastUpdated && (
                   <div className="last-updated">
-                  Last updated: {lastUpdated.toLocaleTimeString()}
+                    Last updated: {lastUpdated.toLocaleTimeString()}
                   </div>
                 )}
               </div>
@@ -722,7 +725,6 @@ function OptimizationView({
   setScenario,
   runOptimization,
   convergenceData,
-  convergenceDomain,
 }) {
   return (
     <div className="view">
@@ -732,11 +734,11 @@ function OptimizationView({
         subtitle="Configure and execute intelligent vehicle routing."
       />
 
-{lastUpdated && (
-  <div className="last-updated">
-    Last updated: {lastUpdated.toLocaleTimeString()}
-  </div>
-)}
+      {lastUpdated && (
+        <div className="last-updated">
+          Last updated: {lastUpdated.toLocaleTimeString()}
+        </div>
+      )}
 
       <section className="panel control-panel">
         <div className="panel-heading">
