@@ -493,6 +493,7 @@ function DashboardView({
         <KpiCard
           label="FITNESS"
           value={formatMetric(result?.fitness)}
+          helper="Lower is better"
           icon="◈"
           accent="cyan"
         />
@@ -805,6 +806,7 @@ function OptimizationView({
             <KpiCard
               label="FITNESS"
               value={formatMetric(result.fitness)}
+              helper="Lower is better"
               icon="◈"
               accent="cyan"
             />
@@ -1340,6 +1342,7 @@ function KpiCard({
   label,
   value,
   unit,
+  helper,
   icon,
   accent,
 }) {
@@ -1354,6 +1357,8 @@ function KpiCard({
         {value}
         {unit && <small>{unit}</small>}
       </div>
+
+      {helper && <span className="kpi-helper">{helper}</span>}
     </div>
   );
 }

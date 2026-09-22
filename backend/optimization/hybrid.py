@@ -1,9 +1,47 @@
 import random
 
-from .local_search import two_opt
+from .local_search import iterated_local_search
 from .qpso import QPSO
+from .qpso_utils import decode_random_keys
+from .repair import repair_solution
 from .fitness import fitness
 from .constraints import validate
+
+
+def _anneal_beta(beta, iteration, iterations, beta_floor_ratio=0.4):
+    """
+    Linearly anneal beta from its starting value down to
+    `beta_floor_ratio * beta` over the course of the run.
+
+    A fixed beta gives QPSO a constant contraction-expansion coefficient
+    for its whole run, so the swarm never settles down: high beta favors
+    exploration (good early), low beta favors exploitation/convergence
+    (good late). Annealing it means the swarm hands 2-opt/Or-opt better,
+    more refined starting orderings by the time local search takes over,
+    instead of the same noisy exploration-level positions throughout.
+    """
+
+    if iterations <= 1:
+        return beta
+
+    floor = beta * beta_floor_ratio
+
+    progress = iteration / (iterations - 1)
+
+    return beta - (beta - floor) * progress
+
+
+def _decode_particle(particle, problem):
+    """Decode a QPSO particle's personal-best position into VRP routes."""
+
+    customer_order = decode_random_keys(particle.best_position)
+
+    routes = repair_solution(customer_order, problem)
+
+    if routes is None:
+        return None
+
+    return {"routes": routes, "fitness": particle.best_fitness}
 
 
 def hybrid_qpso(
@@ -11,19 +49,30 @@ def hybrid_qpso(
     num_particles=10,
     iterations=20,
     beta=0.5,
-    local_search_probability=1.0
+    local_search_probability=1.0,
+    top_k_particles=2,
+    ils_max_kicks=4
 ):
     """
-    Adaptive Hybrid QPSO + 2-opt.
+    Adaptive Hybrid QPSO + (2-opt / Or-opt / double-bridge) iterated local
+    search.
 
-    QPSO performs the global search.
-    2-opt is considered whenever QPSO discovers
-    a new global best solution and is applied
-    according to the local search probability.
+    QPSO performs the global search, using an annealed beta so the swarm
+    explores early and exploits late instead of wandering at a constant
+    rate for the whole run.
 
-    The locally improved solution is kept externally
-    as the best hybrid solution, but is NOT injected
-    back into the QPSO swarm.
+    Whenever QPSO discovers a new global best, local search is applied
+    (according to local_search_probability) not just to the single global
+    best particle but to the top-K particles by personal-best fitness.
+    Plain 2-opt can only reverse a segment in place, so it can get stuck
+    exactly at a starting order it was handed even when a better ordering
+    is one relocate move away; giving it several different starting
+    points (top-K particles) and a richer move set (Or-opt) plus an
+    escape hatch (a double-bridge kick when it stalls) makes it very
+    unlikely all of them land in the same bad local optimum.
+
+    The locally improved solution is kept externally as the best hybrid
+    solution, but is NOT injected back into the QPSO swarm.
     """
 
     qpso = QPSO(
@@ -38,13 +87,15 @@ def hybrid_qpso(
 
     local_search_count = 0
 
-    for _ in range(iterations):
+    for iteration in range(iterations):
+
+        current_beta = _anneal_beta(beta, iteration, iterations)
 
         # Run one QPSO iteration.
         qpso.step(
             problem,
             fitness,
-            beta=beta
+            beta=current_beta
         )
 
         current_qpso_best = qpso.global_best_fitness
@@ -55,22 +106,39 @@ def hybrid_qpso(
 
             if random.random() < local_search_probability:
 
-                qpso_result = qpso.get_best_solution(problem)
+                # Give local search several different starting points
+                # (the top-K particles by personal-best fitness), not
+                # just the single global best -- this is what lets the
+                # hybrid escape a local optimum that one particle's
+                # ordering happens to be stuck in.
+                candidates = sorted(
+                    qpso.particles,
+                    key=lambda particle: particle.best_fitness
+                )[:max(1, top_k_particles)]
 
-                if qpso_result is not None:
+                for particle in candidates:
 
-                    candidate_routes = qpso_result["routes"]
-                    candidate_score = qpso_result["fitness"]
+                    decoded = _decode_particle(particle, problem)
 
-                    improved_routes, improved_score = two_opt(
+                    if decoded is None:
+                        continue
+
+                    candidate_routes = decoded["routes"]
+                    candidate_score = decoded["fitness"]
+
+                    if candidate_score == float("inf"):
+                        continue
+
+                    improved_routes, improved_score = iterated_local_search(
                         candidate_routes,
                         problem,
-                        fitness
+                        fitness,
+                        max_kicks=ils_max_kicks
                     )
 
                     local_search_count += 1
 
-                    # Never allow 2-opt to worsen the solution.
+                    # Never allow local search to worsen the solution.
                     if improved_score > candidate_score:
                         improved_routes = candidate_routes
                         improved_score = candidate_score
