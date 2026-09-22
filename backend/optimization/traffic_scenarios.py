@@ -10,7 +10,7 @@ import networkx as nx
 
 from traffic.graph_builder import build_route_matrix
 from traffic.live_traffic import build_tomtom_live_matrix
-from traffic.osm_loader import load_prepared_road_network
+from traffic.osm_loader import load_prepared_road_network, load_road_network, prepare_graph, load_road_network, prepare_graph, load_road_network, prepare_graph
 
 from .problem import ProblemInstance
 
