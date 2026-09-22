@@ -1,4 +1,5 @@
 from pathlib import Path
+from functools import lru_cache
 
 import osmnx as ox
 
@@ -66,6 +67,21 @@ def prepare_graph(graph):
             data["highway"] = "unknown"
 
     return graph
+
+
+@lru_cache(maxsize=4)
+def _load_prepared_road_network(osm_path):
+    """Load and prepare a committed OSM extract once per backend process."""
+    return prepare_graph(load_road_network(osm_path))
+
+
+def load_prepared_road_network(osm_file):
+    """Return a cached, prepared graph for an OSM file.
+
+    Route-matrix and geometry builders make copies before adding per-request
+    traffic weights, so the cached base graph remains safe to reuse.
+    """
+    return _load_prepared_road_network(str(Path(osm_file).resolve()))
 
 
 def find_shortest_path(graph, source, target):

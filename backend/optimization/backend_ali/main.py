@@ -10,11 +10,18 @@ data. They get replaced by real road distances once Zobiya's
 traffic/graph_builder.py can turn an OSMnx/NetworkX graph into a distance
 matrix. Everything else in this pipeline stays the same when that happens.
 """
+try:
+    from dotenv import load_dotenv
+except ImportError:  # Optional for deployments that inject environment variables.
+    load_dotenv = None
 
+if load_dotenv is not None:
+    load_dotenv()
 import math
 import random
 import statistics
 import time
+from functools import lru_cache
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -38,11 +45,12 @@ from ..traffic_scenarios import (
 )
 from traffic.live_traffic import LiveTrafficError
 from traffic.graph_builder import build_route_geometry
-from traffic.osm_loader import load_road_network, prepare_graph
+from traffic.osm_loader import load_prepared_road_network
 from .database import (
     create_tables,
     save_result,
     get_results,
+    get_results_comparison,
     get_result,
     save_scenario,
     get_scenarios,
@@ -174,13 +182,47 @@ def default_problem():
     )
 
 
-def builtin_problems():
+@lru_cache(maxsize=1)
+def matrix_builtin_problems():
+    """Build the small matrix scenarios once per backend process."""
     problems = {"default": default_problem()}
     problems.update(create_scenarios())
     problems.update(create_extra_scenarios())
-    problems["kothrud"] = create_kothrud_problem()
-    problems["larger_area"] = create_larger_area_problem()   # NEW
     return problems
+
+
+@lru_cache(maxsize=1)
+def kothrud_problem():
+    """Build the Kothrud OSM scenario once, on its first request."""
+    return create_kothrud_problem()
+
+
+@lru_cache(maxsize=1)
+def larger_area_problem():
+    """Build the larger OSM scenario once, on its first request."""
+    return create_larger_area_problem()
+
+
+def builtin_problems():
+    """Return every built-in problem for callers that need the full catalog."""
+    return {
+        **matrix_builtin_problems(),
+        "kothrud": kothrud_problem(),
+        "larger_area": larger_area_problem(),
+    }
+
+
+def get_builtin_problem(scenario_name):
+    """Resolve one built-in scenario without constructing unrelated OSM maps."""
+    matrix_problem = matrix_builtin_problems().get(scenario_name)
+    if matrix_problem is not None:
+        return matrix_problem
+    if scenario_name == "kothrud":
+        return kothrud_problem()
+    if scenario_name == "larger_area":
+        return larger_area_problem()
+    return None
+
 
 def problem_from_scenario_row(row):
     """Turn a scenario saved in SQLite back into a ProblemInstance."""
@@ -208,9 +250,9 @@ def build_problem(scenario_name):
     if scenario_name == LIVE_TRAFFIC_SCENARIO:
         return scenario_name, create_kothrud_live_traffic_problem()
 
-    problems = builtin_problems()
-    if scenario_name in problems:
-        return scenario_name, problems[scenario_name]
+    problem = get_builtin_problem(scenario_name)
+    if problem is not None:
+        return scenario_name, problem
 
     row = get_scenario_by_name(scenario_name)
     if row is not None and row["customers"]:
@@ -241,7 +283,9 @@ def register_builtin_scenarios():
         ),
     }
 
-    for name, problem in builtin_problems().items():
+    # Register only matrix scenarios at startup. OSM matrices are expensive
+    # to derive; scenario_detail registers one lazily if it is requested.
+    for name, problem in matrix_builtin_problems().items():
         save_scenario(
             name,
             distance_matrix=problem.distance_matrix,
@@ -546,43 +590,7 @@ def results(limit: int | None = None):
 @app.get("/results/comparison")
 def results_comparison():
     """Best fitness and fastest runtime per (scenario, algorithm)."""
-
-    summary = {}
-
-    for row in get_results():
-        score = row["fitness"]
-        if score is None:
-            continue
-
-        scenario = row["scenario"] or "default"
-        key = (scenario, row["algorithm"])
-
-        if key not in summary:
-            summary[key] = {
-                "scenario": scenario,
-                "algorithm": row["algorithm"],
-                "best_fitness": score,
-                "best_runtime": row["runtime"],
-                "runs": 0,
-            }
-
-        entry = summary[key]
-        entry["runs"] += 1
-
-        if score < entry["best_fitness"]:
-            entry["best_fitness"] = score
-
-        run_time = row["runtime"]
-        if run_time is not None:
-            if entry["best_runtime"] is None or run_time < entry["best_runtime"]:
-                entry["best_runtime"] = run_time
-
-    ranked = sorted(
-        summary.values(),
-        key=lambda item: (item["scenario"], item["best_fitness"]),
-    )
-
-    return {"comparison": ranked}
+    return {"comparison": get_results_comparison()}
 
 
 @app.get("/results/{run_id}")
@@ -647,7 +655,7 @@ def result_geometry(run_id: int):
         }
 
     try:
-        graph = prepare_graph(load_road_network(osm_file))
+        graph = load_prepared_road_network(osm_file)
         geometry = build_route_geometry(
             graph,
             metadata["locations"],
@@ -750,6 +758,22 @@ def scenario_detail(identifier: str):
         row = get_scenario(int(identifier))
     if row is None:
         row = get_scenario_by_name(identifier.lower().strip())
+
+    # OSM matrices are intentionally built on demand so normal API startup
+    # and matrix-only optimizations do not parse road-network XML files.
+    if row is None and not identifier.isdigit():
+        name = identifier.lower().strip()
+        problem = get_builtin_problem(name)
+        if problem is not None:
+            save_scenario(
+                name,
+                distance_matrix=problem.distance_matrix,
+                travel_time_matrix=problem.travel_time_matrix,
+                vehicles=problem.vehicles,
+                customers=problem.customers,
+                source="builtin",
+            )
+            row = get_scenario_by_name(name)
 
     if row is None:
         raise HTTPException(status_code=404, detail=f"No scenario '{identifier}'")

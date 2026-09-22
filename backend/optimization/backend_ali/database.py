@@ -210,6 +210,27 @@ def get_results(limit=None):
     return [_row_to_run(row) for row in rows]
 
 
+def get_results_comparison():
+    """Return comparison aggregates without decoding every saved JSON result."""
+    connection = get_connection()
+    cursor = connection.cursor()
+    cursor.execute("""
+        SELECT
+            COALESCE(scenario, 'default') AS scenario,
+            algorithm,
+            MIN(fitness) AS best_fitness,
+            MIN(runtime) AS best_runtime,
+            COUNT(*) AS runs
+        FROM optimization_runs
+        WHERE fitness IS NOT NULL
+        GROUP BY COALESCE(scenario, 'default'), algorithm
+        ORDER BY COALESCE(scenario, 'default'), MIN(fitness)
+    """)
+    rows = [dict(row) for row in cursor.fetchall()]
+    connection.close()
+    return rows
+
+
 def get_result(run_id):
     """One saved run by id, or None if it does not exist."""
 

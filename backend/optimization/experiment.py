@@ -81,7 +81,8 @@ def run_hybrid(problem):
         problem,
         num_particles=10,
         iterations=20,
-        beta=0.5
+        beta=0.5,
+        local_search_probability=1.0
     )
 
     runtime = time.perf_counter() - start

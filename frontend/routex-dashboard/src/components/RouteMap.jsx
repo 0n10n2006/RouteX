@@ -1,4 +1,11 @@
-import { MapContainer, TileLayer, GeoJSON, CircleMarker, Popup } from "react-leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  GeoJSON,
+  CircleMarker,
+  Popup,
+  Tooltip,
+} from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
 const VEHICLE_COLOURS = ["#42d9ff", "#ff9f43", "#a78bfa", "#34d399"];
@@ -31,6 +38,7 @@ function RouteMap({ geometry }) {
   return (
     <div className="route-map-container">
       <MapContainer
+      key={geometry.run_id}
         {...(bounds
           ? { bounds, boundsOptions: { padding: [40, 40] } }
           : { center: DEFAULT_CENTER, zoom: 17 })}
@@ -38,7 +46,7 @@ function RouteMap({ geometry }) {
         className="route-map"
       >
         <TileLayer
-          attribution='&copy; OpenStreetMap contributors'
+          attribution="&copy; OpenStreetMap contributors"
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
@@ -58,19 +66,41 @@ function RouteMap({ geometry }) {
           })}
         />
 
-        {locations.map((location) => (
-          <CircleMarker
-            key={location.id}
-            center={[location.latitude, location.longitude]}
-            radius={7}
-          >
-            <Popup>
-              <strong>{location.name}</strong>
-              <br />
-              Location {location.id}
-            </Popup>
-          </CircleMarker>
-        ))}
+        {locations.map((location) => {
+  const isDepot = location.id === 0;
+  const label = isDepot ? "D0" : `C${location.id}`;
+
+  return (
+    <CircleMarker
+      key={location.id}
+      center={[location.latitude, location.longitude]}
+      radius={isDepot ? 9 : 7}
+      pathOptions={{
+        weight: 2,
+        fillOpacity: 1,
+      }}
+    >
+      <Tooltip
+        permanent
+        direction="top"
+        offset={[0, -10]}
+        className="route-location-label"
+      >
+        <strong>{label}</strong>
+      </Tooltip>
+
+      <Popup>
+        <strong>
+          {isDepot ? "Depot 0" : `Customer ${location.id}`}
+        </strong>
+        <br />
+        {location.name}
+        <br />
+        Location {location.id}
+      </Popup>
+    </CircleMarker>
+  );
+})}
       </MapContainer>
     </div>
   );

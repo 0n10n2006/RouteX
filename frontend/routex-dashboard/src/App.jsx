@@ -36,6 +36,7 @@ function App() {
   const [scenario, setScenario] = useState("medium");
 
   const [result, setResult] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
   const [routeGeometry, setRouteGeometry] = useState(null);
   const [comparison, setComparison] = useState([]);
   const [history, setHistory] = useState([]);
@@ -102,7 +103,9 @@ const runOptimization = async () => {
     const optimizationResult = response.data;
 
     setResult(optimizationResult);
+    setLastUpdated(new Date());
     setActiveView("optimization");
+    
 
     // Fetch road geometry for OSM-backed scenarios
     if (isOsmRun(optimizationResult) && optimizationResult.run_id) {
@@ -194,14 +197,15 @@ const runOptimization = async () => {
       const response = await axios.get(`${API_URL}/results/${runId}`);
 
       setResult(response.data);
+      setLastUpdated(new Date());
 
-        if (isOsmRun(response.data)) {
-          await loadRouteGeometry(response.data.id);
-        } else {
-          setRouteGeometry(null);
-        }
+      if (isOsmRun(response.data)) {
+        await loadRouteGeometry(response.data.id);
+      } else {
+        setRouteGeometry(null);
+      }
 
-        setActiveView("optimization");
+      setActiveView("optimization");
 
     } catch (err) {
       console.error(err);
@@ -340,6 +344,7 @@ const runOptimization = async () => {
           {activeView === "dashboard" && (
             <DashboardView
               result={result}
+              lastUpdated={lastUpdated}
               history={history}
               comparison={scenarioComparison}
               loading={loading}
@@ -357,8 +362,9 @@ const runOptimization = async () => {
 
           {/* OPTIMIZATION */}
           {activeView === "optimization" && (
-            <OptimizationView 
+            <OptimizationView
               result={result}
+              lastUpdated={lastUpdated}
               routeGeometry={routeGeometry}
               loading={loading}
               algorithm={algorithm}
@@ -406,6 +412,7 @@ const runOptimization = async () => {
 
 function DashboardView({
   result,
+  lastUpdated,
   history,
   comparison,
   loading,
@@ -543,6 +550,11 @@ function DashboardView({
               <div>
                 <span className="micro-label">LATEST RESULT</span>
                 <h2>Optimization Result</h2>
+                {lastUpdated && (
+                  <div className="last-updated">
+                    Last updated: {lastUpdated.toLocaleTimeString()}
+                  </div>
+                )}
               </div>
 
               <span
@@ -606,12 +618,14 @@ function DashboardView({
                     dataKey="iteration"
                     tick={{ fill: "#7182a5", fontSize: 10 }}
                   />
+
                   <YAxis
                     domain={convergenceYDomain}
                     allowDecimals={false}
                     tickFormatter={(value) => Math.round(value).toLocaleString()}
                     tick={{ fill: "#7182a5", fontSize: 10 }}
                   />
+
                   <Tooltip
                     contentStyle={{
                       background: "#111a31",
@@ -702,6 +716,7 @@ function DashboardView({
 
 function OptimizationView({
   result,
+  lastUpdated,
   routeGeometry,
   loading,
   algorithm,
@@ -718,6 +733,12 @@ function OptimizationView({
         title="Optimization"
         subtitle="Configure and execute intelligent vehicle routing."
       />
+
+      {lastUpdated && (
+        <div className="last-updated">
+          Last updated: {lastUpdated.toLocaleTimeString()}
+        </div>
+      )}
 
       <section className="panel control-panel">
         <div className="panel-heading">
@@ -932,8 +953,7 @@ function OptimizationView({
                     domain={convergenceYDomain}
                     allowDecimals={false}
                     tickFormatter={(value) => Math.round(value).toLocaleString()}
-                    tick={{ fill: "#7182a5", fontSize: 11 }}
-                    axisLine={{ stroke: "#304065" }}
+                    tick={{ fill: "#7182a5", fontSize: 10 }}
                   />
 
                   <Tooltip

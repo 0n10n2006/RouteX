@@ -69,6 +69,9 @@ def _route_summary(origin, destination, api_key, timeout=15):
             "distance": float(summary["lengthInMeters"]),
             "travel_time": float(summary["travelTimeInSeconds"]),
             "traffic_delay": float(summary.get("trafficDelayInSeconds", 0)),
+            "no_traffic_travel_time": float(
+                summary.get("noTrafficTravelTimeInSeconds", summary["travelTimeInSeconds"])
+            ),
         }
     except (KeyError, IndexError, TypeError, ValueError) as error:
         raise LiveTrafficError("TomTom returned an invalid routing response.") from error
@@ -88,6 +91,7 @@ def build_tomtom_live_matrix(locations, max_workers=2):
     distance_matrix = [[0.0] * count for _ in range(count)]
     travel_time_matrix = [[0.0] * count for _ in range(count)]
     traffic_delays = []
+    no_traffic_totals = []
 
     pairs = [
         (origin_index, destination_index)
@@ -111,6 +115,14 @@ def build_tomtom_live_matrix(locations, max_workers=2):
             distance_matrix[origin_index][destination_index] = summary["distance"]
             travel_time_matrix[origin_index][destination_index] = summary["travel_time"]
             traffic_delays.append(summary["traffic_delay"])
+            no_traffic_totals.append(summary["no_traffic_travel_time"])
+
+    live_total = sum(
+        travel_time_matrix[i][j]
+        for i in range(count)
+        for j in range(count)
+        if i != j
+    )
 
     return {
         "distance_matrix": distance_matrix,
@@ -122,6 +134,8 @@ def build_tomtom_live_matrix(locations, max_workers=2):
             "distance_unit": "metres",
             "travel_time_unit": "seconds",
             "traffic_delay_seconds": sum(traffic_delays),
+            "no_traffic_travel_time_seconds": sum(no_traffic_totals),
+            "live_travel_time_seconds": live_total,
             "location_count": count,
         },
     }

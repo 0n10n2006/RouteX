@@ -2,7 +2,9 @@ import networkx as nx
 import pytest
 
 from traffic.osm_loader import (
+    _load_prepared_road_network,
     load_road_network,
+    load_prepared_road_network,
     prepare_graph,
     find_shortest_path,
     get_edge_distance,
@@ -20,6 +22,27 @@ from traffic.osm_loader import (
     get_dynamic_travel_time,
     get_node_coordinates,
 )
+
+
+def test_load_prepared_road_network_caches_normalized_paths(monkeypatch, tmp_path):
+    """A route request must not parse the same OSM file repeatedly."""
+    calls = []
+
+    def fake_load(osm_path):
+        calls.append(osm_path)
+        graph = nx.MultiDiGraph()
+        graph.add_edge(1, 2, length=1, highway="residential")
+        return graph
+
+    monkeypatch.setattr("traffic.osm_loader.load_road_network", fake_load)
+    _load_prepared_road_network.cache_clear()
+
+    osm_file = tmp_path / "test.osm"
+    first = load_prepared_road_network(osm_file)
+    second = load_prepared_road_network(str(osm_file))
+
+    assert first is second
+    assert calls == [str(osm_file.resolve())]
 
 
 def test_load_road_network():
