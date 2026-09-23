@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -69,8 +69,52 @@ function ScenarioBuilder({ onResult }) {
   const fileInputRef = useRef(null);
   const nextVehicleId = useRef(3);
 
+  const [permanentDepots, setPermanentDepots] = useState([]);
+  
   const hasDepot = locations.some((l) => l.type === "depot");
   const customers = locations.filter((l) => l.type === "customer");
+  
+  // Load permanent depots on mount
+  useEffect(() => {
+    const fetchDepots = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/depots`);
+        setPermanentDepots(res.data.depots);
+      } catch (err) {
+        // Not logged in or error
+      }
+    };
+    fetchDepots();
+  }, []);
+  
+  const saveDepot = async (loc) => {
+    try {
+      const res = await axios.post(`${API_URL}/depots`, {
+        name: loc.name || "My Depot",
+        latitude: loc.latitude,
+        longitude: loc.longitude
+      });
+      setPermanentDepots(prev => [...prev, res.data]);
+      alert("Depot saved permanently!");
+    } catch (err) {
+      alert("Failed to save depot. Are you logged in?");
+    }
+  };
+  
+  const loadDepot = (depot) => {
+    setLocations(prev => {
+      const withoutDepot = prev.filter(l => l.type !== "depot");
+      return [...withoutDepot, {
+        id: nextId++,
+        name: depot.name,
+        latitude: depot.latitude,
+        longitude: depot.longitude,
+        type: "depot",
+        demand: 0
+      }];
+    });
+    setFlyTarget({ center: [depot.latitude, depot.longitude], zoom: 15 });
+  };
 
   const handleMapClick = useCallback(
     (latlng) => {
@@ -342,9 +386,27 @@ function ScenarioBuilder({ onResult }) {
           <div className="builder-section">
             <div className="builder-section-header">
               <span className="micro-label">LOCATIONS</span>
-              <span className="builder-count">
-                {locations.length} placed
-              </span>
+              <div className="flex gap-2">
+                {permanentDepots.length > 0 && !hasDepot && (
+                  <select 
+                    className="text-xs bg-black/20 border border-border/20 rounded px-1"
+                    onChange={(e) => {
+                      const d = permanentDepots.find(x => x.id.toString() === e.target.value);
+                      if (d) loadDepot(d);
+                      e.target.value = "";
+                    }}
+                    defaultValue=""
+                  >
+                    <option value="" disabled>Load Depot...</option>
+                    {permanentDepots.map(d => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </select>
+                )}
+                <span className="builder-count">
+                  {locations.length} placed
+                </span>
+              </div>
             </div>
 
             {locations.length === 0 ? (
@@ -382,13 +444,24 @@ function ScenarioBuilder({ onResult }) {
                           }
                         />
 
-                        <button
-                          className="location-remove-btn"
-                          onClick={() => handleRemove(loc.id)}
-                          title="Remove location"
-                        >
-                          ×
-                        </button>
+                        <div className="flex gap-1 ml-auto">
+                          {isDepot && (
+                            <button
+                              className="text-xs text-primary hover:underline px-1"
+                              onClick={() => saveDepot(loc)}
+                              title="Save as permanent depot"
+                            >
+                              Save
+                            </button>
+                          )}
+                          <button
+                            className="location-remove-btn"
+                            onClick={() => handleRemove(loc.id)}
+                            title="Remove location"
+                          >
+                            ×
+                          </button>
+                        </div>
                       </div>
 
                       <div className="location-item-details">

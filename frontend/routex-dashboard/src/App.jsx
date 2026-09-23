@@ -12,8 +12,12 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import "./App.css";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { auth } from "./firebase";
 import RouteMap from "./components/RouteMap";
 import ScenarioBuilder from "./components/ScenarioBuilder";
+import LandingPage from "./components/LandingPage";
+import AdminDashboard from "./components/AdminDashboard";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 
@@ -50,7 +54,45 @@ function App() {
   const [benchmarkLoading, setBenchmarkLoading] = useState(false);
 
   const [error, setError] = useState("");
-  const [activeView, setActiveView] = useState("dashboard");
+  const [activeView, setActiveView] = useState(() => {
+    const saved = localStorage.getItem("activeView");
+    return saved || "dashboard"; // "dashboard", "builder", "optimization", "comparison", "auth", "landing"
+  });
+
+  useEffect(() => {
+    localStorage.setItem("activeView", activeView);
+  }, [activeView]);
+
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [demoMode, setDemoMode] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      
+      if (currentUser) {
+        // Automatically inject Firebase ID token into all axios requests
+        const token = await currentUser.getIdToken();
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        
+        try {
+          // Sync user to backend
+          await axios.post(`${API_URL}/auth/sync`);
+          // Get user role
+          const roleRes = await axios.get(`${API_URL}/auth/me`);
+          setUser({ ...currentUser, role: roleRes.data.role });
+        } catch (err) {
+          console.error("Auth sync failed", err);
+          setUser(currentUser); // fallback
+        }
+      } else {
+        delete axios.defaults.headers.common['Authorization'];
+        setUser(null);
+      }
+      setAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const loadComparison = async () => {
     setComparisonLoading(true);
@@ -241,6 +283,24 @@ const runOptimization = async () => {
     setError("");
   };
 
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setDemoMode(false);
+      navigate("dashboard");
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  if (authLoading) {
+    return <div className="min-h-screen flex items-center justify-center bg-background text-foreground">Loading...</div>;
+  }
+
+  if (!user && !demoMode) {
+    return <LandingPage onLoginClick={() => setDemoMode(true)} />;
+  }
+
   return (
     <div className="app-shell">
       {/* SIDEBAR */}
@@ -306,9 +366,31 @@ const runOptimization = async () => {
             <span className="nav-icon">◷</span>
             <span>Run History</span>
           </button>
+          
+          {user?.role === "admin" && (
+            <button
+              className={`nav-item ${
+                activeView === "admin" ? "active" : ""
+              }`}
+              onClick={() => navigate("admin")}
+            >
+              <span className="nav-icon">🛡️</span>
+              <span>Admin</span>
+            </button>
+          )}
         </nav>
 
         <div className="sidebar-bottom">
+          <div className="user-profile p-4 border border-border/20 rounded-md mb-4 text-sm bg-black/20">
+            <p className="text-muted-foreground truncate mb-2">{user?.email}</p>
+            <button 
+              onClick={handleLogout}
+              className="w-full text-left text-red-400 hover:text-red-300 transition-colors"
+            >
+              Log Out
+            </button>
+          </div>
+
           <div className="system-card">
             <div className="system-card-title">SYSTEM STATUS</div>
 
@@ -425,6 +507,11 @@ const runOptimization = async () => {
               loadHistory={loadHistory}
               loadHistoricalResult={loadHistoricalResult}
             />
+          )}
+
+          {/* ADMIN */}
+          {activeView === "admin" && (
+            <AdminDashboard user={user} />
           )}
         </div>
       </main>

@@ -25,9 +25,11 @@ import statistics
 import time
 from functools import lru_cache
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import firebase_admin
+from firebase_admin import credentials, auth as firebase_auth
 
 from ..qpso import QPSO
 from ..greedy_vrp import greedy_vrp
@@ -94,6 +96,29 @@ app = FastAPI(
     description="Quantum-Inspired Intelligent Traffic Route Optimization",
     version="1.2.0"
 )
+
+# Initialize Firebase Admin for token verification
+try:
+    firebase_admin.get_app()
+except ValueError:
+    # Use the project ID from the frontend config
+    # We only need this to verify JWT tokens, not to write to Firebase DBs.
+    firebase_admin.initialize_app(options={'projectId': 'routex-auth'})
+
+def get_current_user(authorization: str = Header(None)):
+    """FastAPI Dependency to verify Firebase ID token and return user info."""
+    if not authorization or not authorization.startswith("Bearer "):
+        # For development/simplicity, we won't strictly block unauthenticated users
+        # on every endpoint unless we enforce it, but we can return None.
+        return None
+    
+    token = authorization.split(" ")[1]
+    try:
+        decoded_token = firebase_auth.verify_id_token(token)
+        return decoded_token # dict containing 'uid', 'email', etc.
+    except Exception as e:
+        print(f"Token verification failed: {e}")
+        return None
 
 # Allow the frontend (running on a different port) to call this API.
 app.add_middleware(
@@ -456,7 +481,7 @@ def run_algorithm(algo, problem, seed=None):
         "runtime": runtime,
     }
 
-def run_and_save(algo, scenario_name, problem, seed=None):
+def run_and_save(algo, scenario_name, problem, seed=None, user_id=None):
     """Run one algorithm, store the full result in SQLite, return the JSON."""
 
     result = run_algorithm(algo, problem, seed=seed)
@@ -486,6 +511,7 @@ def run_and_save(algo, scenario_name, problem, seed=None):
         seed=seed,
         travel_time=travel_time,
         traffic_metadata=problem.metadata,
+        user_id=user_id,
     )
 
     return {
@@ -526,8 +552,10 @@ def home():
 # --------------------------------------------------
 
 @app.post("/optimize")
-def optimize(request: OptimizeRequest):
+def optimize(request: OptimizeRequest, user: dict = Depends(get_current_user)):
     """Run one algorithm on one scenario, save it, and return the result."""
+    
+    user_id = user['uid'] if user else None
 
     try:
         scenario_name, problem = build_problem(request.scenario)
@@ -540,19 +568,22 @@ def optimize(request: OptimizeRequest):
             scenario_name,
             problem,
             seed=request.seed,
+            user_id=user_id,
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
 
 
 @app.post("/optimize/custom")
-def optimize_custom(request: CustomOptimizeRequest):
+def optimize_custom(request: CustomOptimizeRequest, user: dict = Depends(get_current_user)):
     """Run optimization on user-provided lat/lng locations anywhere in the world.
 
     Downloads the OSM road network covering all locations on the fly using
+    downloads the OSM road network covering all locations on the fly using
     osmnx, builds distance and travel-time matrices from it, and runs the
     requested algorithm.  The frontend sends map clicks, not matrices.
     """
+    user_id = user['uid'] if user else None
     if len(request.locations) < 2:
         raise HTTPException(
             status_code=400,
@@ -650,7 +681,7 @@ def optimize_custom(request: CustomOptimizeRequest):
 
     try:
         result = run_and_save(
-            request.algorithm, "custom", problem, seed=request.seed,
+            request.algorithm, "custom", problem, seed=request.seed, user_id=user_id
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
@@ -724,10 +755,23 @@ def optimize_kothrud_incident(request: IncidentOptimizeRequest):
 # --------------------------------------------------
 
 @app.get("/results")
-def results(limit: int | None = None):
+def results(limit: int | None = None, user: dict = Depends(get_current_user)):
     """Every saved run, newest first. Optional ?limit=20."""
-
-    return {"results": get_results(limit=limit)}
+    
+    all_results = get_results(limit=limit)
+    if user:
+        # Admins can see all, regular users see only their own
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT role FROM users WHERE firebase_uid = ?", (user['uid'],))
+        row = cursor.fetchone()
+        conn.close()
+        
+        is_admin = row and row['role'] == 'admin'
+        if not is_admin:
+            all_results = [r for r in all_results if r.get('user_id') == user['uid']]
+            
+    return {"results": all_results}
 
 
 # IMPORTANT: this must stay ABOVE /results/{run_id}, otherwise FastAPI would
@@ -1053,3 +1097,136 @@ def benchmark(request: BenchmarkRequest | None = None):
         "summary": summarise_trials(trials),
         "runs": trials,
     }
+
+# --------------------------------------------------
+# AUTH & USERS
+# --------------------------------------------------
+
+from .database import get_connection
+
+@app.post("/auth/sync")
+def sync_user(user: dict = Depends(get_current_user)):
+    """Sync the authenticated Firebase user into the SQLite database."""
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE firebase_uid = ?", (user['uid'],))
+    existing = cursor.fetchone()
+    
+    if existing:
+        cursor.execute("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE firebase_uid = ?", (user['uid'],))
+    else:
+        cursor.execute(
+            "INSERT INTO users (firebase_uid, email, last_login) VALUES (?, ?, CURRENT_TIMESTAMP)",
+            (user['uid'], user.get('email', ''))
+        )
+    conn.commit()
+    conn.close()
+    
+    return {"status": "ok", "uid": user['uid']}
+
+@app.get("/auth/me")
+def get_me(user: dict = Depends(get_current_user)):
+    """Return the user's role from SQLite."""
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE firebase_uid = ?", (user['uid'],))
+    db_user = cursor.fetchone()
+    conn.close()
+    
+    if db_user:
+        return dict(db_user)
+    return {"firebase_uid": user['uid'], "role": "user", "email": user.get('email', '')}
+
+@app.get("/admin/users")
+def get_users(user: dict = Depends(get_current_user)):
+    """Admin only: list all users."""
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+        
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT role FROM users WHERE firebase_uid = ?", (user['uid'],))
+    me = cursor.fetchone()
+    
+    if not me or me['role'] != 'admin':
+        conn.close()
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    cursor.execute("SELECT firebase_uid, email, role, created_at, last_login FROM users ORDER BY created_at DESC")
+    users = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    
+    return {"users": users}
+
+# --------------------------------------------------
+# PERMANENT DEPOTS
+# --------------------------------------------------
+
+class DepotRequest(BaseModel):
+    name: str
+    latitude: float
+    longitude: float
+
+@app.get("/depots")
+def get_depots(user: dict = Depends(get_current_user)):
+    """Get permanent depots for the current user."""
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+        
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM depots WHERE user_id = ?", (user['uid'],))
+    depots = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    
+    return {"depots": depots}
+
+@app.post("/depots")
+def add_depot(request: DepotRequest, user: dict = Depends(get_current_user)):
+    """Add a permanent depot for the user."""
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+        
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO depots (user_id, name, latitude, longitude) VALUES (?, ?, ?, ?)",
+        (user['uid'], request.name, request.latitude, request.longitude)
+    )
+    conn.commit()
+    new_id = cursor.lastrowid
+    
+    cursor.execute("SELECT * FROM depots WHERE id = ?", (new_id,))
+    depot = dict(cursor.fetchone())
+    conn.close()
+    
+    return depot
+
+@app.delete("/depots/{depot_id}")
+def delete_depot(depot_id: int, user: dict = Depends(get_current_user)):
+    """Delete a user's permanent depot."""
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+        
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    # Verify ownership
+    cursor.execute("SELECT user_id FROM depots WHERE id = ?", (depot_id,))
+    depot = cursor.fetchone()
+    if not depot or depot['user_id'] != user['uid']:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Depot not found")
+        
+    cursor.execute("DELETE FROM depots WHERE id = ?", (depot_id,))
+    conn.commit()
+    conn.close()
+    
+    return {"status": "ok"}
+

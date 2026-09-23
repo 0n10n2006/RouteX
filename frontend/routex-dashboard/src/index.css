@@ -1,3 +1,71 @@
+@import "tailwindcss";
+@config "../tailwind.config.js";
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 3.9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 3.9%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
+  }
+  .dark {
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 14.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 0 0% 83.1%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
 :root {
   --text: #6b6375;
   --text-h: #08060d;
@@ -108,4 +176,81 @@ code {
   line-height: 135%;
   padding: 4px 8px;
   background: var(--code-bg);
+}
+
+
+@theme {
+  --font-body-sm: Inter;
+  --font-headline-sm: Inter;
+  --font-headline-xl: Inter;
+  --font-headline-xl-mobile: Inter;
+  --font-headline-md: Inter;
+  --font-label-sm: Inter;
+  --font-label-lg: Inter;
+  --font-body-lg: Inter;
+  --font-code-sm: Inter;
+  --font-label-md: Inter;
+  --font-body-md: Inter;
+  --font-headline-lg: Inter;
+
+  --spacing-margin: 1.5rem;
+  --spacing-gutter-lg: 1.5rem;
+  --spacing-space-2xl: 2rem;
+  --spacing-space-xs: 0.25rem;
+  --spacing-margin-sm: 1rem;
+  --spacing-margin-lg: 2rem;
+  --spacing-space-xl: 1.5rem;
+  --spacing-space-md: 0.75rem;
+  --spacing-gutter-sm: 0.75rem;
+  --spacing-space-lg: 1rem;
+  --spacing-space-sm: 0.5rem;
+  --spacing-gutter: 1rem;
+
+  --color-secondary: #ffb77a;
+  --color-surface-tint: #61d4ff;
+  --color-on-primary-container: #004559;
+  --color-on-secondary-fixed-variant: #6d3a00;
+  --color-primary: #61d4ff;
+  --color-surface-variant: #233553;
+  --color-inverse-primary: #006783;
+  --color-tertiary-fixed-dim: #cebdff;
+  --color-surface-container: #0c1f3d;
+  --color-secondary-fixed-dim: #ffb77a;
+  --color-tertiary-fixed: #e8ddff;
+  --color-on-tertiary: #381385;
+  --color-on-primary: #003545;
+  --color-inverse-on-surface: #1f304f;
+  --color-primary-fixed: #bce9ff;
+  --color-error: #ffb4ab;
+  --color-on-surface: #d7e2ff;
+  --color-surface-bright: #283958;
+  --color-secondary-fixed: #ffdcc2;
+  --color-on-error-container: #ffdad6;
+  --color-secondary-container: #d37b20;
+  --color-inverse-surface: #d7e2ff;
+  --color-surface-container-low: #071b39;
+  --color-tertiary: #cebdff;
+  --color-on-background: #d7e2ff;
+  --color-tertiary-container: #b59cff;
+  --color-surface-dim: #001330;
+  --color-outline: #879399;
+  --color-on-secondary-container: #432100;
+  --color-background: #001330;
+  --color-primary-container: #18b9e8;
+  --color-on-tertiary-fixed: #21005e;
+  --color-surface-container-high: #182a48;
+  --color-outline-variant: #3d484e;
+  --color-error-container: #93000a;
+  --color-on-secondary-fixed: #2e1500;
+  --color-on-tertiary-fixed-variant: #4f319c;
+  --color-surface: #001330;
+  --color-surface-container-lowest: #000e26;
+  --color-primary-fixed-dim: #61d4ff;
+  --color-on-error: #690005;
+  --color-on-secondary: #4c2700;
+  --color-on-primary-fixed-variant: #004d63;
+  --color-on-tertiary-container: #472894;
+  --color-surface-container-highest: #233553;
+  --color-on-primary-fixed: #001f29;
+  --color-on-surface-variant: #bcc8cf;
 }

@@ -69,6 +69,7 @@ RUN_COLUMNS = {
     "congestion_penalty": "REAL",
     "fuel_cost": "REAL",
     "traffic_metadata": "TEXT",     # source, units and simulated traffic inputs
+    "user_id": "TEXT",              # firebase uid of the user who ran this
 }
 
 # Scenario columns also migrate gradually so existing local databases and
@@ -130,6 +131,30 @@ def create_tables():
                 f"ALTER TABLE scenarios ADD COLUMN {column} {column_type}"
             )
 
+    # Users table for mapping Firebase UIDs to roles/history
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            firebase_uid TEXT PRIMARY KEY,
+            email TEXT NOT NULL,
+            role TEXT DEFAULT 'user',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_login TIMESTAMP
+        )
+    """)
+
+    # Permanent Depots table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS depots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT,
+            name TEXT NOT NULL,
+            latitude REAL NOT NULL,
+            longitude REAL NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(firebase_uid)
+        )
+    """)
+
     connection.commit()
     connection.close()
 
@@ -153,6 +178,7 @@ def save_result(
     congestion_penalty=None,
     fuel_cost=None,
     traffic_metadata=None,
+    user_id=None,
 ):
     """Save one algorithm run. Returns the new row's id."""
 
@@ -164,14 +190,14 @@ def save_result(
             algorithm, fitness, distance, runtime, scenario,
             routes, convergence, iterations, constraint_violations,
             vehicles_used, seed, travel_time, congestion_penalty, fuel_cost,
-            traffic_metadata
+            traffic_metadata, user_id
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         algorithm, fitness_value, distance, runtime, scenario,
         _dumps(routes), _dumps(convergence), iterations, constraint_violations,
         vehicles_used, seed, travel_time, congestion_penalty, fuel_cost,
-        _dumps(traffic_metadata)
+        _dumps(traffic_metadata), user_id
     ))
 
     run_id = cursor.lastrowid
