@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import "./App.css";
 import RouteMap from "./components/RouteMap";
+import ScenarioBuilder from "./components/ScenarioBuilder";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 
@@ -268,6 +269,16 @@ const runOptimization = async () => {
 
           <button
             className={`nav-item ${
+              activeView === "builder" ? "active" : ""
+            }`}
+            onClick={() => navigate("builder")}
+          >
+            <span className="nav-icon">✦</span>
+            <span>Scenario Builder</span>
+          </button>
+
+          <button
+            className={`nav-item ${
               activeView === "optimization" ? "active" : ""
             }`}
             onClick={() => navigate("optimization")}
@@ -357,6 +368,21 @@ const runOptimization = async () => {
               convergenceData={convergenceData}
               bestFitness={bestFitness}
               loadHistoricalResult={loadHistoricalResult}
+            />
+          )}
+
+          {/* SCENARIO BUILDER */}
+          {activeView === "builder" && (
+            <ScenarioBuilder
+              onResult={(optimizationResult) => {
+                setResult(optimizationResult);
+                setLastUpdated(new Date());
+                if (optimizationResult.geometry) {
+                  setRouteGeometry(optimizationResult.geometry);
+                }
+                loadComparison();
+                loadHistory();
+              }}
             />
           )}
 

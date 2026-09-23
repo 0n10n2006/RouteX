@@ -18,6 +18,8 @@ except ImportError:  # Optional for deployments that inject environment variable
 if load_dotenv is not None:
     load_dotenv()
 import math
+import os
+import tempfile
 import random
 import statistics
 import time
@@ -44,8 +46,8 @@ from ..traffic_scenarios import (
     create_larger_area_problem,
 )
 from traffic.live_traffic import LiveTrafficError
-from traffic.graph_builder import build_route_geometry
-from traffic.osm_loader import load_prepared_road_network
+from traffic.graph_builder import build_route_geometry, build_route_matrix
+from traffic.osm_loader import load_prepared_road_network, prepare_graph
 from .database import (
     create_tables,
     save_result,
@@ -125,6 +127,27 @@ class IncidentOptimizeRequest(BaseModel):
     incident_factor: float = 0.25
     incident_edge: list[int] | None = None
     incident_scenario: str | None = None
+
+
+class CustomLocation(BaseModel):
+    id: int
+    name: str = ""
+    latitude: float
+    longitude: float
+    type: str = "customer"     # "depot" or "customer"
+    demand: int = 1
+
+
+class CustomVehicle(BaseModel):
+    id: int
+    capacity: int = 10
+
+
+class CustomOptimizeRequest(BaseModel):
+    locations: list[CustomLocation]
+    vehicles: list[CustomVehicle]
+    algorithm: str = "qpso"
+    seed: int | None = None
 
 
 class ScenarioRequest(BaseModel):
@@ -520,6 +543,128 @@ def optimize(request: OptimizeRequest):
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
+
+
+@app.post("/optimize/custom")
+def optimize_custom(request: CustomOptimizeRequest):
+    """Run optimization on user-provided lat/lng locations anywhere in the world.
+
+    Downloads the OSM road network covering all locations on the fly using
+    osmnx, builds distance and travel-time matrices from it, and runs the
+    requested algorithm.  The frontend sends map clicks, not matrices.
+    """
+    if len(request.locations) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="At least 2 locations are needed (1 depot + 1 customer)",
+        )
+
+    depots = [loc for loc in request.locations if loc.type == "depot"]
+    customers_raw = [loc for loc in request.locations if loc.type == "customer"]
+    if len(depots) != 1:
+        raise HTTPException(
+            status_code=400,
+            detail="Exactly one depot is required",
+        )
+    if not customers_raw:
+        raise HTTPException(
+            status_code=400,
+            detail="At least one customer location is required",
+        )
+    if not request.vehicles:
+        raise HTTPException(
+            status_code=400,
+            detail="At least one vehicle is required",
+        )
+
+    # Re-index: depot gets id 0, customers get 1..N
+    depot = depots[0]
+    locations = [
+        {"id": 0, "name": depot.name or "Depot",
+         "latitude": depot.latitude, "longitude": depot.longitude},
+    ]
+    problem_customers = []
+    for i, cust in enumerate(customers_raw, start=1):
+        locations.append({
+            "id": i,
+            "name": cust.name or f"Customer {i}",
+            "latitude": cust.latitude,
+            "longitude": cust.longitude,
+        })
+        problem_customers.append({"id": i, "demand": max(cust.demand, 1)})
+
+    problem_vehicles = [
+        {"id": v.id, "capacity": max(v.capacity, 1)} for v in request.vehicles
+    ]
+
+    # Download OSM road network covering all points
+    lats = [loc["latitude"] for loc in locations]
+    lngs = [loc["longitude"] for loc in locations]
+    center_lat = (min(lats) + max(lats)) / 2
+    center_lng = (min(lngs) + max(lngs)) / 2
+
+    # Radius: half-diagonal of the bounding box + generous padding
+    from math import radians, cos, sqrt
+    dlat = max(lats) - min(lats)
+    dlng = max(lngs) - min(lngs)
+    lat_m = dlat * 111320
+    lng_m = dlng * 111320 * cos(radians(center_lat))
+    half_diagonal = sqrt(lat_m ** 2 + lng_m ** 2) / 2
+    radius = max(half_diagonal * 1.5, 1500)  # at least 1.5 km
+
+    try:
+        import osmnx as ox
+        graph = ox.graph_from_point(
+            (center_lat, center_lng),
+            dist=radius,
+            network_type="drive",
+            simplify=True,
+        )
+        graph = prepare_graph(graph)
+    except Exception as error:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Could not download road network for the selected area: {error}",
+        )
+
+    # Build matrices using existing pipeline
+    try:
+        matrix_data = build_route_matrix(graph, locations)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error))
+
+    problem = ProblemInstance(
+        distance_matrix=matrix_data["distance_matrix"],
+        travel_time_matrix=matrix_data["travel_time_matrix"],
+        vehicles=problem_vehicles,
+        customers=problem_customers,
+        metadata={
+            **matrix_data["metadata"],
+            "source": "Custom user locations with OSM road network",
+            "osm_source": "osmnx.graph_from_point",
+            "traffic_factors": None,
+            "locations": locations,
+            "incident": None,
+        },
+    )
+
+    try:
+        result = run_and_save(
+            request.algorithm, "custom", problem, seed=request.seed,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
+
+    # Attach geometry inline so frontend has it immediately
+    try:
+        geometry = build_route_geometry(
+            graph, locations, result["routes"],
+        )
+        result["geometry"] = geometry
+    except Exception:
+        result["geometry"] = None
+
+    return result
 
 
 @app.post("/optimize/kothrud-incident")
