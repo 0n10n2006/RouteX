@@ -101,10 +101,6 @@ app = FastAPI(
 # On Render, set FIREBASE_SERVICE_ACCOUNT_KEY to the full JSON content of
 # your Firebase service account key (Project Settings > Service Accounts >
 # Generate New Private Key).  Locally, ADC from `gcloud auth` is used.
-# Initialize Firebase Admin for token verification.
-# On Render, set FIREBASE_SERVICE_ACCOUNT_KEY to the full JSON content of
-# your Firebase service account key (Project Settings > Service Accounts >
-# Generate New Private Key).  Locally, ADC from `gcloud auth` is used.
 try:
     firebase_admin.get_app()
 except ValueError:
@@ -796,15 +792,6 @@ def optimize_custom(request: CustomOptimizeRequest, user: dict = Depends(get_cur
         raise HTTPException(status_code=400, detail=str(error))
 
     # Attach geometry inline so frontend has it immediately
-    if not used_haversine_fallback:
-        try:
-            geometry = build_route_geometry(
-                graph, locations, result["routes"],
-            )
-            result["geometry"] = geometry
-        except Exception:
-            result["geometry"] = None
-    else:
     if not used_haversine_fallback:
         try:
             geometry = build_route_geometry(
