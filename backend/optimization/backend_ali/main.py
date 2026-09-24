@@ -101,9 +101,27 @@ app = FastAPI(
 # On Render, set FIREBASE_SERVICE_ACCOUNT_KEY to the full JSON content of
 # your Firebase service account key (Project Settings > Service Accounts >
 # Generate New Private Key).  Locally, ADC from `gcloud auth` is used.
+# Initialize Firebase Admin for token verification.
+# On Render, set FIREBASE_SERVICE_ACCOUNT_KEY to the full JSON content of
+# your Firebase service account key (Project Settings > Service Accounts >
+# Generate New Private Key).  Locally, ADC from `gcloud auth` is used.
 try:
     firebase_admin.get_app()
 except ValueError:
+    import json as _json, base64 as _base64
+
+    _sa_key = os.environ.get("FIREBASE_SERVICE_ACCOUNT_KEY", "").strip()
+    if _sa_key:
+        # Accept raw JSON or base64-encoded JSON
+        try:
+            _sa_dict = _json.loads(_sa_key)
+        except _json.JSONDecodeError:
+            _sa_dict = _json.loads(_base64.b64decode(_sa_key))
+        cred = credentials.Certificate(_sa_dict)
+        firebase_admin.initialize_app(cred)
+    else:
+        # Local dev — rely on Application Default Credentials
+        firebase_admin.initialize_app(options={'projectId': 'routex-auth'})
     import json as _json, base64 as _base64
 
     _sa_key = os.environ.get("FIREBASE_SERVICE_ACCOUNT_KEY", "").strip()
@@ -650,6 +668,7 @@ def optimize_custom(request: CustomOptimizeRequest, user: dict = Depends(get_cur
 
     # Radius: half-diagonal of the bounding box + generous padding
     from math import radians, cos, sqrt, asin, sin
+    from math import radians, cos, sqrt, asin, sin
     dlat = max(lats) - min(lats)
     dlng = max(lngs) - min(lngs)
     lat_m = dlat * 111320
@@ -752,9 +771,14 @@ def optimize_custom(request: CustomOptimizeRequest, user: dict = Depends(get_cur
     problem = ProblemInstance(
         distance_matrix=distance_matrix,
         travel_time_matrix=travel_time_matrix,
+        distance_matrix=distance_matrix,
+        travel_time_matrix=travel_time_matrix,
         vehicles=problem_vehicles,
         customers=problem_customers,
         metadata={
+            **matrix_metadata,
+            "source": source_label,
+            "osm_source": osm_source_label,
             **matrix_metadata,
             "source": source_label,
             "osm_source": osm_source_label,
@@ -772,6 +796,15 @@ def optimize_custom(request: CustomOptimizeRequest, user: dict = Depends(get_cur
         raise HTTPException(status_code=400, detail=str(error))
 
     # Attach geometry inline so frontend has it immediately
+    if not used_haversine_fallback:
+        try:
+            geometry = build_route_geometry(
+                graph, locations, result["routes"],
+            )
+            result["geometry"] = geometry
+        except Exception:
+            result["geometry"] = None
+    else:
     if not used_haversine_fallback:
         try:
             geometry = build_route_geometry(
