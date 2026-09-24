@@ -97,13 +97,27 @@ app = FastAPI(
     version="1.2.0"
 )
 
-# Initialize Firebase Admin for token verification
+# Initialize Firebase Admin for token verification.
+# On Render, set FIREBASE_SERVICE_ACCOUNT_KEY to the full JSON content of
+# your Firebase service account key (Project Settings > Service Accounts >
+# Generate New Private Key).  Locally, ADC from `gcloud auth` is used.
 try:
     firebase_admin.get_app()
 except ValueError:
-    # Use the project ID from the frontend config
-    # We only need this to verify JWT tokens, not to write to Firebase DBs.
-    firebase_admin.initialize_app(options={'projectId': 'routex-auth'})
+    import json as _json, base64 as _base64
+
+    _sa_key = os.environ.get("FIREBASE_SERVICE_ACCOUNT_KEY", "").strip()
+    if _sa_key:
+        # Accept raw JSON or base64-encoded JSON
+        try:
+            _sa_dict = _json.loads(_sa_key)
+        except _json.JSONDecodeError:
+            _sa_dict = _json.loads(_base64.b64decode(_sa_key))
+        cred = credentials.Certificate(_sa_dict)
+        firebase_admin.initialize_app(cred)
+    else:
+        # Local dev — rely on Application Default Credentials
+        firebase_admin.initialize_app(options={'projectId': 'routex-auth'})
 
 def get_current_user(authorization: str = Header(None)):
     """FastAPI Dependency to verify Firebase ID token and return user info."""
@@ -635,7 +649,7 @@ def optimize_custom(request: CustomOptimizeRequest, user: dict = Depends(get_cur
     center_lng = (min(lngs) + max(lngs)) / 2
 
     # Radius: half-diagonal of the bounding box + generous padding
-    from math import radians, cos, sqrt
+    from math import radians, cos, sqrt, asin, sin
     dlat = max(lats) - min(lats)
     dlng = max(lngs) - min(lngs)
     lat_m = dlat * 111320
@@ -643,36 +657,107 @@ def optimize_custom(request: CustomOptimizeRequest, user: dict = Depends(get_cur
     half_diagonal = sqrt(lat_m ** 2 + lng_m ** 2) / 2
     radius = max(half_diagonal * 1.5, 1500)  # at least 1.5 km
 
-    try:
-        import osmnx as ox
-        graph = ox.graph_from_point(
+    # Try multiple Overpass API mirrors — the default (overpass-api.de) often
+    # blocks cloud/datacenter IPs such as those used by Render.
+    # Keep timeouts short so we fall back to haversine quickly rather than
+    # exceeding Render's ~30s request timeout.
+    import osmnx as ox
+    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+
+    OVERPASS_MIRRORS = [
+        "https://overpass.kumi.systems/api/interpreter",
+        "https://overpass-api.de/api/interpreter",
+    ]
+
+    graph = None
+    last_error = None
+
+    def _try_download(mirror_url):
+        """Download graph from a single mirror (runs in thread for timeout)."""
+        ox.settings.overpass_url = mirror_url
+        ox.settings.requests_timeout = 10
+        g = ox.graph_from_point(
             (center_lat, center_lng),
             dist=radius,
             network_type="drive",
             simplify=True,
         )
-        graph = prepare_graph(graph)
-    except Exception as error:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Could not download road network for the selected area: {error}",
-        )
+        return prepare_graph(g)
 
-    # Build matrices using existing pipeline
-    try:
-        matrix_data = build_route_matrix(graph, locations)
-    except ValueError as error:
-        raise HTTPException(status_code=422, detail=str(error))
+    for mirror_url in OVERPASS_MIRRORS:
+        try:
+            # Hard 12s wall-clock cap per mirror via thread executor
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                future = pool.submit(_try_download, mirror_url)
+                graph = future.result(timeout=12)
+            break  # success
+        except (FuturesTimeout, Exception) as error:
+            last_error = error
+            continue
+
+    # Fallback: if all Overpass mirrors failed, build straight-line
+    # (haversine) distance/time matrices so the optimizer still works.
+    used_haversine_fallback = False
+    if graph is None:
+        used_haversine_fallback = True
+
+        def _haversine_m(lat1, lon1, lat2, lon2):
+            """Great-circle distance between two points in metres."""
+            R = 6_371_000  # Earth radius in metres
+            phi1, phi2 = radians(lat1), radians(lat2)
+            dphi = radians(lat2 - lat1)
+            dlam = radians(lon2 - lon1)
+            a = sin(dphi / 2) ** 2 + cos(phi1) * cos(phi2) * sin(dlam / 2) ** 2
+            return R * 2 * asin(sqrt(a))
+
+        n = len(locations)
+        fallback_dist = [[0.0] * n for _ in range(n)]
+        fallback_time = [[0.0] * n for _ in range(n)]
+        AVG_SPEED_MS = 30 * 1000 / 3600  # 30 km/h in m/s
+
+        for i in range(n):
+            for j in range(n):
+                if i == j:
+                    continue
+                d = _haversine_m(
+                    locations[i]["latitude"], locations[i]["longitude"],
+                    locations[j]["latitude"], locations[j]["longitude"],
+                )
+                # Road distance is typically ~1.4x straight-line distance
+                road_est = d * 1.4
+                fallback_dist[i][j] = road_est
+                fallback_time[i][j] = road_est / AVG_SPEED_MS
+
+    # Build matrices — either from the real road graph or from haversine fallback
+    if used_haversine_fallback:
+        distance_matrix = fallback_dist
+        travel_time_matrix = fallback_time
+        matrix_metadata = {
+            "distance_unit": "metres",
+            "travel_time_unit": "seconds",
+        }
+        source_label = "Custom user locations with haversine distance (Overpass API unavailable)"
+        osm_source_label = "haversine_fallback"
+    else:
+        try:
+            matrix_data = build_route_matrix(graph, locations)
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error))
+        distance_matrix = matrix_data["distance_matrix"]
+        travel_time_matrix = matrix_data["travel_time_matrix"]
+        matrix_metadata = matrix_data["metadata"]
+        source_label = "Custom user locations with OSM road network"
+        osm_source_label = "osmnx.graph_from_point"
 
     problem = ProblemInstance(
-        distance_matrix=matrix_data["distance_matrix"],
-        travel_time_matrix=matrix_data["travel_time_matrix"],
+        distance_matrix=distance_matrix,
+        travel_time_matrix=travel_time_matrix,
         vehicles=problem_vehicles,
         customers=problem_customers,
         metadata={
-            **matrix_data["metadata"],
-            "source": "Custom user locations with OSM road network",
-            "osm_source": "osmnx.graph_from_point",
+            **matrix_metadata,
+            "source": source_label,
+            "osm_source": osm_source_label,
             "traffic_factors": None,
             "locations": locations,
             "incident": None,
@@ -687,12 +772,15 @@ def optimize_custom(request: CustomOptimizeRequest, user: dict = Depends(get_cur
         raise HTTPException(status_code=400, detail=str(error))
 
     # Attach geometry inline so frontend has it immediately
-    try:
-        geometry = build_route_geometry(
-            graph, locations, result["routes"],
-        )
-        result["geometry"] = geometry
-    except Exception:
+    if not used_haversine_fallback:
+        try:
+            geometry = build_route_geometry(
+                graph, locations, result["routes"],
+            )
+            result["geometry"] = geometry
+        except Exception:
+            result["geometry"] = None
+    else:
         result["geometry"] = None
 
     return result
