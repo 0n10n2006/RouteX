@@ -62,7 +62,7 @@ function App() {
   const [error, setError] = useState("");
   const [activeView, setActiveView] = useState(() => {
     const saved = localStorage.getItem("activeView");
-    return saved || "dashboard"; // "dashboard", "builder", "optimization", "comparison", "auth", "landing"
+    return saved || "builder"; // "dashboard", "builder", "optimization", "comparison", "auth", "landing"
   });
 
   useEffect(() => {
@@ -325,22 +325,22 @@ const runOptimization = async () => {
         <nav className="sidebar-nav">
           <button
             className={`nav-item ${
-              activeView === "dashboard" ? "active" : ""
-            }`}
-            onClick={() => navigate("dashboard")}
-          >
-            <span className="nav-icon">▦</span>
-            <span>Dashboard</span>
-          </button>
-
-          <button
-            className={`nav-item ${
               activeView === "builder" ? "active" : ""
             }`}
             onClick={() => navigate("builder")}
           >
             <span className="nav-icon">✦</span>
             <span>Scenario Builder</span>
+          </button>
+
+          <button
+            className={`nav-item ${
+              activeView === "dashboard" ? "active" : ""
+            }`}
+            onClick={() => navigate("dashboard")}
+          >
+            <span className="nav-icon">▦</span>
+            <span>Dashboard</span>
           </button>
 
           <button
