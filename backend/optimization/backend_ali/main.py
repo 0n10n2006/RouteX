@@ -97,13 +97,27 @@ app = FastAPI(
     version="1.2.0"
 )
 
-# Initialize Firebase Admin for token verification
+# Initialize Firebase Admin for token verification.
+# On Render, set FIREBASE_SERVICE_ACCOUNT_KEY to the full JSON content of
+# your Firebase service account key (Project Settings > Service Accounts >
+# Generate New Private Key).  Locally, ADC from `gcloud auth` is used.
 try:
     firebase_admin.get_app()
 except ValueError:
-    # Use the project ID from the frontend config
-    # We only need this to verify JWT tokens, not to write to Firebase DBs.
-    firebase_admin.initialize_app(options={'projectId': 'routex-auth'})
+    import json as _json, base64 as _base64
+
+    _sa_key = os.environ.get("FIREBASE_SERVICE_ACCOUNT_KEY", "").strip()
+    if _sa_key:
+        # Accept raw JSON or base64-encoded JSON
+        try:
+            _sa_dict = _json.loads(_sa_key)
+        except _json.JSONDecodeError:
+            _sa_dict = _json.loads(_base64.b64decode(_sa_key))
+        cred = credentials.Certificate(_sa_dict)
+        firebase_admin.initialize_app(cred)
+    else:
+        # Local dev — rely on Application Default Credentials
+        firebase_admin.initialize_app(options={'projectId': 'routex-auth'})
 
 def get_current_user(authorization: str = Header(None)):
     """FastAPI Dependency to verify Firebase ID token and return user info."""
