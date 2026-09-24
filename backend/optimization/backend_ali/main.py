@@ -767,14 +767,9 @@ def optimize_custom(request: CustomOptimizeRequest, user: dict = Depends(get_cur
     problem = ProblemInstance(
         distance_matrix=distance_matrix,
         travel_time_matrix=travel_time_matrix,
-        distance_matrix=distance_matrix,
-        travel_time_matrix=travel_time_matrix,
         vehicles=problem_vehicles,
         customers=problem_customers,
         metadata={
-            **matrix_metadata,
-            "source": source_label,
-            "osm_source": osm_source_label,
             **matrix_metadata,
             "source": source_label,
             "osm_source": osm_source_label,
