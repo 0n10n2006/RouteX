@@ -43,7 +43,7 @@ function RouteMap({ geometry }) {
           ? { bounds, boundsOptions: { padding: [40, 40] } }
           : { center: DEFAULT_CENTER, zoom: 17 })}
         scrollWheelZoom={true}
-        className="route-map"
+        className="route-map dark-tiles"
       >
         <TileLayer
           attribution="&copy; OpenStreetMap contributors"

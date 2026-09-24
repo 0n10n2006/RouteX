@@ -70,23 +70,28 @@ function ScenarioBuilder({ onResult }) {
   const nextVehicleId = useRef(3);
 
   const [permanentDepots, setPermanentDepots] = useState([]);
-  
-  const hasDepot = locations.some((l) => l.type === "depot");
+  const [forceDepotMode, setForceDepotMode] = useState(false);
+  const [savedDepotId, setSavedDepotId] = useState(null);
+
+  const depots = locations.filter((l) => l.type === "depot");
+  const activeDepot = depots.find((l) => l.active) || depots[0] || null;
+  const hasDepot = depots.length > 0;
   const customers = locations.filter((l) => l.type === "customer");
-  
+
   // Load permanent depots on mount
   useEffect(() => {
     const fetchDepots = async () => {
       try {
         const res = await axios.get(`${API_URL}/depots`);
         setPermanentDepots(res.data.depots);
-      } catch (err) {
-        // Not logged in or error
+      } catch {
+        // Not logged in, or the depots endpoint isn't reachable yet --
+        // either way, the builder still works without saved depots.
       }
     };
     fetchDepots();
   }, []);
-  
+
   const saveDepot = async (loc) => {
     try {
       const res = await axios.post(`${API_URL}/depots`, {
@@ -95,46 +100,78 @@ function ScenarioBuilder({ onResult }) {
         longitude: loc.longitude
       });
       setPermanentDepots(prev => [...prev, res.data]);
-      alert("Depot saved permanently!");
-    } catch (err) {
-      alert("Failed to save depot. Are you logged in?");
+      setSavedDepotId(loc.id);
+      setTimeout(() => {
+        setSavedDepotId((id) => (id === loc.id ? null : id));
+      }, 2000);
+    } catch {
+      setError("Failed to save depot. Are you logged in?");
     }
   };
-  
+
+  // Loads a saved depot onto the map as a new depot candidate (it does not
+  // replace any depot already placed) and makes it the active one.
   const loadDepot = (depot) => {
-    setLocations(prev => {
-      const withoutDepot = prev.filter(l => l.type !== "depot");
-      return [...withoutDepot, {
-        id: nextId++,
-        name: depot.name,
-        latitude: depot.latitude,
-        longitude: depot.longitude,
-        type: "depot",
-        demand: 0
-      }];
+    setLocations((prev) => {
+      const deactivated = prev.map((l) =>
+        l.type === "depot" ? { ...l, active: false } : l
+      );
+      return [
+        ...deactivated,
+        {
+          id: nextId++,
+          name: depot.name,
+          latitude: depot.latitude,
+          longitude: depot.longitude,
+          type: "depot",
+          demand: 0,
+          active: true,
+        },
+      ];
     });
     setFlyTarget({ center: [depot.latitude, depot.longitude], zoom: 15 });
   };
 
+  // Marks a single depot as the one used for the next optimization run.
+  const setActiveDepot = useCallback((id) => {
+    setLocations((prev) =>
+      prev.map((l) =>
+        l.type === "depot" ? { ...l, active: l.id === id } : l
+      )
+    );
+    setRouteGeometry(null);
+    setResult(null);
+  }, []);
+
   const handleMapClick = useCallback(
     (latlng) => {
-      const type = hasDepot ? "customer" : "depot";
+      const placingDepot = !hasDepot || forceDepotMode;
+      const type = placingDepot ? "depot" : "customer";
       const id = nextId++;
-      setLocations((prev) => [
-        ...prev,
-        {
-          id,
-          name: type === "depot" ? "Depot" : "",
-          latitude: latlng.lat,
-          longitude: latlng.lng,
-          type,
-          demand: type === "customer" ? 2 : 0,
-        },
-      ]);
+
+      setLocations((prev) => {
+        const isFirstDepot =
+          type === "depot" && !prev.some((l) => l.type === "depot");
+
+        return [
+          ...prev,
+          {
+            id,
+            name: type === "depot" ? "Depot" : "",
+            latitude: latlng.lat,
+            longitude: latlng.lng,
+            type,
+            demand: type === "customer" ? 2 : 0,
+            active: type === "depot" ? isFirstDepot : undefined,
+          },
+        ];
+      });
+
+      if (type === "depot") setForceDepotMode(false);
       setRouteGeometry(null);
       setResult(null);
     },
-    [hasDepot]
+    [hasDepot, forceDepotMode]
   );
 
   const handleDragEnd = useCallback((id, lat, lng) => {
@@ -148,7 +185,23 @@ function ScenarioBuilder({ onResult }) {
   }, []);
 
   const handleRemove = useCallback((id) => {
-    setLocations((prev) => prev.filter((l) => l.id !== id));
+    setLocations((prev) => {
+      const removed = prev.find((l) => l.id === id);
+      let next = prev.filter((l) => l.id !== id);
+
+      // If the active depot was removed, promote the next remaining
+      // depot (if any) so there's always an active depot to run with.
+      if (removed?.type === "depot" && removed.active) {
+        const promotedId = next.find((l) => l.type === "depot")?.id;
+        if (promotedId != null) {
+          next = next.map((l) =>
+            l.id === promotedId ? { ...l, active: true } : l
+          );
+        }
+      }
+
+      return next;
+    });
     setRouteGeometry(null);
     setResult(null);
   }, []);
@@ -216,8 +269,31 @@ function ScenarioBuilder({ onResult }) {
       try {
         const data = JSON.parse(ev.target.result);
         if (data.locations && Array.isArray(data.locations)) {
-          setLocations(data.locations);
-          nextId = Math.max(...data.locations.map((l) => l.id), nextId) + 1;
+          let importedLocations = data.locations;
+
+          // Older exports (or hand-written files) may not have an
+          // `active` flag on their depots -- make sure exactly one
+          // depot ends up active so optimization can run immediately.
+          const importedDepots = importedLocations.filter(
+            (l) => l.type === "depot"
+          );
+          if (
+            importedDepots.length > 0 &&
+            !importedDepots.some((d) => d.active)
+          ) {
+            let promoted = false;
+            importedLocations = importedLocations.map((l) => {
+              if (l.type === "depot" && !promoted) {
+                promoted = true;
+                return { ...l, active: true };
+              }
+              return l;
+            });
+          }
+
+          setLocations(importedLocations);
+          nextId =
+            Math.max(...importedLocations.map((l) => l.id), nextId) + 1;
         }
         if (data.vehicles && Array.isArray(data.vehicles)) {
           setVehicles(data.vehicles);
@@ -236,9 +312,9 @@ function ScenarioBuilder({ onResult }) {
   };
 
   const runOptimization = async () => {
-    if (!hasDepot || customers.length === 0 || vehicles.length === 0) {
+    if (!activeDepot || customers.length === 0 || vehicles.length === 0) {
       setError(
-        "Place at least 1 depot and 1 customer, and add at least 1 vehicle."
+        "Place at least 1 active depot and 1 customer, and add at least 1 vehicle."
       );
       return;
     }
@@ -248,9 +324,13 @@ function ScenarioBuilder({ onResult }) {
     setRouteGeometry(null);
     setResult(null);
 
+    // Only the active depot is sent -- any other saved depot candidates
+    // stay on the map/list but are excluded from this run.
+    const runLocations = [activeDepot, ...customers];
+
     try {
       const res = await axios.post(`${API_URL}/optimize/custom`, {
-        locations: locations.map((l) => ({
+        locations: runLocations.map((l) => ({
           id: l.id,
           name: l.name,
           latitude: l.latitude,
@@ -302,7 +382,9 @@ function ScenarioBuilder({ onResult }) {
           <h1>Custom Locations</h1>
           <p>
             Click the map to place a depot and customer locations anywhere in
-            the world. The optimizer will download real road data automatically.
+            the world. You can place multiple depots and choose which one is
+            active for each run — the optimizer downloads real road data
+            automatically.
           </p>
         </div>
       </div>
@@ -323,7 +405,9 @@ function ScenarioBuilder({ onResult }) {
           </div>
 
           <div className="builder-map-hint">
-            {!hasDepot
+            {forceDepotMode
+              ? "Click the map to place another depot"
+              : !hasDepot
               ? "Click the map to place your depot"
               : "Click to add customer locations"}
           </div>
@@ -332,11 +416,11 @@ function ScenarioBuilder({ onResult }) {
             center={DEFAULT_CENTER}
             zoom={5}
             scrollWheelZoom={true}
-            className="builder-map"
+            className="builder-map dark-tiles"
           >
             <TileLayer
-              attribution="&copy; OpenStreetMap contributors &copy; CartoDB"
-              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+              attribution="&copy; OpenStreetMap contributors"
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
 
             <MapClickHandler onMapClick={handleMapClick} />
@@ -386,8 +470,8 @@ function ScenarioBuilder({ onResult }) {
           <div className="builder-section">
             <div className="builder-section-header">
               <span className="micro-label">LOCATIONS</span>
-              <div className="flex gap-2">
-                {permanentDepots.length > 0 && !hasDepot && (
+              <div className="flex gap-2 items-center">
+                {permanentDepots.length > 0 && (
                   <select 
                     className="text-xs bg-black/20 border border-border/20 rounded px-1"
                     onChange={(e) => {
@@ -403,6 +487,14 @@ function ScenarioBuilder({ onResult }) {
                     ))}
                   </select>
                 )}
+                <button
+                  className="builder-add-btn"
+                  onClick={() => setForceDepotMode(true)}
+                  disabled={forceDepotMode}
+                  title="Place another depot on the map"
+                >
+                  + Depot
+                </button>
                 <span className="builder-count">
                   {locations.length} placed
                 </span>
@@ -417,10 +509,13 @@ function ScenarioBuilder({ onResult }) {
               <div className="location-list">
                 {locations.map((loc) => {
                   const isDepot = loc.type === "depot";
+                  const isActiveDepot = isDepot && loc.active;
                   return (
                     <div
                       key={loc.id}
-                      className={`location-item ${isDepot ? "depot" : ""}`}
+                      className={`location-item ${isDepot ? "depot" : ""} ${
+                        isDepot && !isActiveDepot ? "depot-inactive" : ""
+                      }`}
                     >
                       <div className="location-item-header">
                         <span
@@ -444,14 +539,29 @@ function ScenarioBuilder({ onResult }) {
                           }
                         />
 
-                        <div className="flex gap-1 ml-auto">
+                        <div className="flex gap-1 ml-auto items-center">
+                          {isDepot && depots.length > 1 && (
+                            isActiveDepot ? (
+                              <span className="status-badge success depot-active-badge">
+                                ACTIVE
+                              </span>
+                            ) : (
+                              <button
+                                className="text-xs text-primary hover:underline px-1"
+                                onClick={() => setActiveDepot(loc.id)}
+                                title="Use this depot for the next run"
+                              >
+                                Set Active
+                              </button>
+                            )
+                          )}
                           {isDepot && (
                             <button
                               className="text-xs text-primary hover:underline px-1"
                               onClick={() => saveDepot(loc)}
                               title="Save as permanent depot"
                             >
-                              Save
+                              {savedDepotId === loc.id ? "Saved ✓" : "Save"}
                             </button>
                           )}
                           <button
@@ -557,7 +667,7 @@ function ScenarioBuilder({ onResult }) {
             <button
               className="primary-button full-width"
               onClick={runOptimization}
-              disabled={loading || !hasDepot || customers.length === 0}
+              disabled={loading || !activeDepot || customers.length === 0}
               style={{ marginTop: 12 }}
             >
               {loading ? "Optimizing…" : "Optimize Routes"}

@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
 import { Card, CardHeader, CardTitle, CardContent } from "./ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
-import { Users, Activity } from "lucide-react";
+import { Users } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 

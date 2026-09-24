@@ -2505,6 +2505,16 @@ button:disabled {
   border-color: rgba(24, 185, 232, 0.4);
 }
 
+.builder-add-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.builder-add-btn:disabled:hover {
+  background: rgba(24, 185, 232, 0.1);
+  border-color: rgba(24, 185, 232, 0.25);
+}
+
 
 /* =========================================================
    LOCATION LIST
@@ -2535,6 +2545,19 @@ button:disabled {
 .location-item.depot {
   border-color: rgba(24, 185, 232, 0.35);
   background: rgba(24, 185, 232, 0.04);
+}
+
+.location-item.depot.depot-inactive {
+  border-style: dashed;
+  border-color: rgba(24, 185, 232, 0.2);
+  background: transparent;
+  opacity: 0.75;
+}
+
+.depot-active-badge {
+  padding: 1px 7px;
+  font-size: 9px;
+  letter-spacing: 0.4px;
 }
 
 .location-item-header {
@@ -3014,4 +3037,556 @@ button:disabled {
   .builder-actions-row .secondary-button {
     width: 100%;
   }
+}
+
+
+/* =========================================================
+   LANDING PAGE
+   Reuses the same tokens/components as the dashboard
+   (.panel, .primary-button, .secondary-button, .field, etc.)
+   so the pre-login page and the app itself never feel like
+   two different products.
+========================================================= */
+
+.landing {
+  min-height: 100vh;
+  width: 100%;
+
+  display: flex;
+  flex-direction: column;
+
+  background:
+    radial-gradient(
+      circle at top right,
+      rgba(24, 185, 232, 0.08),
+      transparent 35%
+    ),
+    #08101f;
+}
+
+.landing-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+
+  background: rgba(8, 16, 31, 0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid #203154;
+}
+
+.landing-header-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+
+  height: 64px;
+  padding: 0 24px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.landing-brand {
+  display: flex;
+  align-items: center;
+}
+
+.landing-brand-logo {
+  height: 34px;
+  width: auto;
+  object-fit: contain;
+  display: block;
+}
+
+.landing-main {
+  flex: 1;
+  width: 100%;
+}
+
+.landing-hero {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 56px 24px 40px;
+}
+
+.landing-hero-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 48px;
+  align-items: start;
+}
+
+.landing-hero-copy h1 {
+  margin: 0 0 18px;
+
+  color: #eef6ff;
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -1px;
+}
+
+.landing-hero-accent {
+  background: linear-gradient(135deg, #18b9e8, #42d9ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.landing-hero-copy p {
+  margin: 0 0 28px;
+
+  max-width: 46ch;
+
+  color: #8092b3;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.landing-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.landing-login-card {
+  padding: 28px;
+}
+
+.landing-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  margin-top: 6px;
+}
+
+.landing-form-error {
+  padding: 10px 12px;
+
+  background: rgba(231, 76, 98, 0.12);
+  border: 1px solid rgba(231, 76, 98, 0.4);
+  border-radius: 8px;
+
+  color: #ff9eaa;
+  font-size: 12.5px;
+}
+
+.landing-input-wrap {
+  position: relative;
+
+  display: flex;
+  align-items: center;
+}
+
+.landing-input-icon {
+  position: absolute;
+  left: 14px;
+
+  color: #64789f;
+  pointer-events: none;
+}
+
+.landing-input {
+  width: 100%;
+  height: 44px;
+
+  padding: 0 14px 0 40px;
+
+  background: #091326;
+  border: 1px solid #2a3b60;
+  border-radius: 9px;
+
+  color: #eaf3ff;
+  font-size: 13px;
+
+  outline: none;
+
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.landing-input::placeholder {
+  color: #536484;
+}
+
+.landing-input:focus {
+  border-color: #18b9e8;
+  box-shadow: 0 0 0 3px rgba(24, 185, 232, 0.1);
+}
+
+.landing-input-toggle {
+  position: absolute;
+  right: 12px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: transparent;
+  color: #64789f;
+
+  cursor: pointer;
+}
+
+.landing-input-toggle:hover {
+  color: #18b9e8;
+}
+
+.landing-form-toggle {
+  align-self: center;
+}
+
+.landing-features {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 40px 24px 72px;
+}
+
+.landing-section-heading {
+  max-width: 640px;
+  margin-bottom: 28px;
+}
+
+.landing-section-heading h2 {
+  margin: 8px 0 10px;
+
+  color: #eef6ff;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+}
+
+.landing-section-heading p {
+  margin: 0;
+
+  color: #8092b3;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.landing-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+}
+
+.landing-feature-card {
+  padding: 22px;
+
+  background: linear-gradient(145deg, #101a30, #0d172a);
+  border: 1px solid #203154;
+  border-radius: 14px;
+
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.landing-feature-card:hover {
+  border-color: #18b9e8;
+  box-shadow: 0 0 24px rgba(24, 185, 232, 0.18);
+  transform: translateY(-2px);
+}
+
+.landing-feature-icon {
+  width: 44px;
+  height: 44px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  margin-bottom: 14px;
+
+  background: #08101f;
+  border: 1px solid #203154;
+  border-radius: 10px;
+
+  color: #18b9e8;
+}
+
+.landing-feature-card h3 {
+  margin: 0 0 8px;
+
+  color: #edf5ff;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
+.landing-feature-card p {
+  margin: 0;
+
+  color: #8092b3;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.landing-footer {
+  border-top: 1px solid #203154;
+
+  padding: 22px 24px;
+
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  color: #64789f;
+  font-size: 12px;
+}
+
+.landing-footer-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 980px) {
+  .landing-hero-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-feature-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .landing-feature-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-hero-copy h1 {
+    font-size: 32px;
+  }
+}
+
+
+/* =========================================================
+   LAZY VIEW LOADING FALLBACK
+========================================================= */
+
+.view-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  min-height: 200px;
+
+  color: #64789f;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+
+
+/* =========================================================
+   LANDING PAGE: STATS STRIP
+========================================================= */
+
+.landing-stats {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 24px 8px;
+
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+
+  border-top: 1px solid #203154;
+  border-bottom: 1px solid #203154;
+}
+
+.landing-stat {
+  padding: 22px 20px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  border-left: 1px solid #203154;
+}
+
+.landing-stat:first-child {
+  border-left: none;
+}
+
+.landing-stat-value {
+  font-family: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+  font-size: 26px;
+  font-weight: 700;
+  color: #42d9ff;
+  letter-spacing: -0.5px;
+}
+
+.landing-stat-label {
+  color: #7182a5;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* =========================================================
+   LANDING PAGE: PIPELINE
+========================================================= */
+
+.landing-pipeline-section {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 48px 24px 8px;
+}
+
+.landing-pipeline {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.landing-pipeline-step {
+  position: relative;
+
+  flex: 1;
+  min-width: 130px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+
+  padding: 16px 10px;
+}
+
+.landing-pipeline-icon {
+  width: 42px;
+  height: 42px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: linear-gradient(145deg, #101a30, #0d172a);
+  border: 1px solid #203154;
+  border-radius: 50%;
+
+  color: #18b9e8;
+}
+
+.landing-pipeline-label {
+  color: #eef6ff;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.landing-pipeline-caption {
+  color: #64789f;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.landing-pipeline-arrow {
+  position: absolute;
+  top: 28px;
+  right: -14px;
+
+  color: #3c527d;
+  font-size: 14px;
+}
+
+.landing-pipeline-loop {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  margin: 12px auto 0;
+  padding: 8px 16px;
+
+  background: rgba(255, 159, 67, 0.08);
+  border: 1px dashed rgba(255, 159, 67, 0.35);
+  border-radius: 999px;
+
+  color: #ffb877;
+  font-size: 11.5px;
+  font-weight: 600;
+
+  width: fit-content;
+}
+
+@media (max-width: 980px) {
+  .landing-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .landing-stat:nth-child(3) {
+    border-left: none;
+  }
+
+  .landing-pipeline {
+    flex-wrap: wrap;
+  }
+
+  .landing-pipeline-step {
+    min-width: 45%;
+  }
+
+  .landing-pipeline-arrow {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .landing-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-stat {
+    border-left: none;
+    border-top: 1px solid #203154;
+  }
+
+  .landing-stat:first-child {
+    border-top: none;
+  }
+}
+
+
+/* =========================================================
+   DARK MAP TILES
+   Standard OpenStreetMap tiles are always free and keyless
+   (unlike some hosted "dark mode" tile sets, which have
+   started requiring a paid API key). Rather than depend on a
+   third party's free-tier policy, we take the same free OSM
+   tiles used everywhere else and invert just the tile layer
+   with CSS -- markers, popups, and route lines are excluded
+   so only the basemap itself goes dark.
+========================================================= */
+
+.dark-tiles .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9)
+    saturate(0.6);
+}
+
+.dark-tiles .leaflet-control-attribution {
+  background: rgba(8, 16, 31, 0.75);
+  color: #7182a5;
+}
+
+.dark-tiles .leaflet-control-attribution a {
+  color: #8092b3;
+}
+
+.dark-tiles .leaflet-control-zoom a {
+  background: #101a30;
+  color: #eef6ff;
+  border-color: #203154;
+}
+
+.dark-tiles .leaflet-control-zoom a:hover {
+  background: #16233f;
 }

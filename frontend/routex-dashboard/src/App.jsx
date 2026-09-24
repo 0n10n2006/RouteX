@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import {
   LineChart,
@@ -14,10 +14,16 @@ import {
 import "./App.css";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "./firebase";
-import RouteMap from "./components/RouteMap";
-import ScenarioBuilder from "./components/ScenarioBuilder";
 import LandingPage from "./components/LandingPage";
-import AdminDashboard from "./components/AdminDashboard";
+
+// Loaded on demand: each of these pulls in a heavy library (Leaflet for
+// maps, the admin user table) that most sessions never touch, so keeping
+// them out of the main bundle shrinks the initial load noticeably.
+const RouteMap = lazy(() => import("./components/RouteMap"));
+const ScenarioBuilder = lazy(() => import("./components/ScenarioBuilder"));
+const AdminDashboard = lazy(() => import("./components/AdminDashboard"));
+
+const ViewLoading = () => <div className="view-loading">Loading…</div>;
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 
@@ -455,17 +461,19 @@ const runOptimization = async () => {
 
           {/* SCENARIO BUILDER */}
           {activeView === "builder" && (
-            <ScenarioBuilder
-              onResult={(optimizationResult) => {
-                setResult(optimizationResult);
-                setLastUpdated(new Date());
-                if (optimizationResult.geometry) {
-                  setRouteGeometry(optimizationResult.geometry);
-                }
-                loadComparison();
-                loadHistory();
-              }}
-            />
+            <Suspense fallback={<ViewLoading />}>
+              <ScenarioBuilder
+                onResult={(optimizationResult) => {
+                  setResult(optimizationResult);
+                  setLastUpdated(new Date());
+                  if (optimizationResult.geometry) {
+                    setRouteGeometry(optimizationResult.geometry);
+                  }
+                  loadComparison();
+                  loadHistory();
+                }}
+              />
+            </Suspense>
           )}
 
           {/* OPTIMIZATION */}
@@ -511,7 +519,9 @@ const runOptimization = async () => {
 
           {/* ADMIN */}
           {activeView === "admin" && (
-            <AdminDashboard user={user} />
+            <Suspense fallback={<ViewLoading />}>
+              <AdminDashboard user={user} />
+            </Suspense>
           )}
         </div>
       </main>
@@ -1033,7 +1043,9 @@ function OptimizationView({
                 </span>
               </div>
 
-              <RouteMap geometry={routeGeometry} />
+              <Suspense fallback={<ViewLoading />}>
+                <RouteMap geometry={routeGeometry} />
+              </Suspense>
             </section>
           )}
 

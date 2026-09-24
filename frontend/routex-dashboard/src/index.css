@@ -1,59 +1,43 @@
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
+/* =========================================================
+   SHADCN/UI THEME VARIABLES
+   Tuned to match RouteX's own navy/cyan dashboard palette
+   (see App.css) rather than the shadcn defaults, so
+   shadcn-based components (Admin) look native, not bolted on.
+   The app is always dark (see index.html's <html class="dark">),
+   so :root and .dark intentionally share the same values.
+========================================================= */
+
 @layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
-  }
+  :root,
   .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    --background: 219 59% 8%;
+    --foreground: 212 100% 97%;
+    --card: 221 50% 13%;
+    --card-foreground: 212 100% 97%;
+    --popover: 219 53% 11%;
+    --popover-foreground: 212 100% 97%;
+    --primary: 194 82% 50%;
+    --primary-foreground: 219 62% 9%;
+    --secondary: 221 39% 27%;
+    --secondary-foreground: 212 100% 97%;
+    --muted: 221 50% 13%;
+    --muted-foreground: 220 22% 55%;
+    --accent: 194 82% 50%;
+    --accent-foreground: 219 62% 9%;
+    --destructive: 351 76% 60%;
+    --destructive-foreground: 212 100% 97%;
+    --border: 220 45% 23%;
+    --input: 220 45% 23%;
+    --ring: 194 82% 50%;
+    --chart-1: 194 82% 50%;
+    --chart-2: 192 100% 63%;
+    --chart-3: 214 100% 60%;
+    --chart-4: 270 60% 70%;
+    --chart-5: 160 60% 50%;
+    --radius: 0.6rem;
   }
 }
 
@@ -66,118 +50,21 @@
   }
 }
 
-:root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
-
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
-
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
-
 body {
   margin: 0;
 }
 
 #root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
-
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
+  width: 100%;
+  min-height: 100%;
   margin: 0;
 }
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
 
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
-}
-
+/* =========================================================
+   MATERIAL DESIGN TOKENS
+   Used by the landing page (LandingPage.jsx).
+========================================================= */
 
 @theme {
   --font-body-sm: Inter;
@@ -206,51 +93,47 @@ code {
   --spacing-space-sm: 0.5rem;
   --spacing-gutter: 1rem;
 
-  --color-secondary: #ffb77a;
-  --color-surface-tint: #61d4ff;
-  --color-on-primary-container: #004559;
-  --color-on-secondary-fixed-variant: #6d3a00;
-  --color-primary: #61d4ff;
-  --color-surface-variant: #233553;
+  /* Same navy/cyan palette as App.css, exposed as Tailwind utilities
+     (bg-surface, text-on-surface, bg-primary, ...) for the landing page. */
+  --color-surface: #08101f;
+  --color-surface-dim: #060c17;
+  --color-surface-bright: #16233f;
+  --color-surface-container-lowest: #060c17;
+  --color-surface-container-low: #0d172a;
+  --color-surface-container: #101a30;
+  --color-surface-container-high: #16233f;
+  --color-surface-container-highest: #1c2c4d;
+  --color-surface-variant: #203154;
+  --color-surface-tint: #18b9e8;
+
+  --color-primary: #18b9e8;
+  --color-on-primary: #06101d;
+  --color-primary-container: #0d172a;
+  --color-on-primary-container: #7be8ff;
+
+  --color-secondary: #42d9ff;
+  --color-on-secondary: #06101d;
+  --color-secondary-container: #101a30;
+  --color-on-secondary-container: #7be8ff;
+
+  --color-tertiary: #a78bfa;
+  --color-on-tertiary: #06101d;
+
+  --color-on-surface: #eef6ff;
+  --color-on-surface-variant: #8092b3;
+
+  --color-outline: #3c527d;
+  --color-outline-variant: #203154;
+
+  --color-background: #08101f;
+  --color-on-background: #eef6ff;
+
+  --color-error: #ff8a95;
+  --color-error-container: #4a1620;
+  --color-on-error: #06101d;
+  --color-on-error-container: #ffb4ab;
+
+  --color-inverse-surface: #eef6ff;
+  --color-inverse-on-surface: #101a30;
   --color-inverse-primary: #006783;
-  --color-tertiary-fixed-dim: #cebdff;
-  --color-surface-container: #0c1f3d;
-  --color-secondary-fixed-dim: #ffb77a;
-  --color-tertiary-fixed: #e8ddff;
-  --color-on-tertiary: #381385;
-  --color-on-primary: #003545;
-  --color-inverse-on-surface: #1f304f;
-  --color-primary-fixed: #bce9ff;
-  --color-error: #ffb4ab;
-  --color-on-surface: #d7e2ff;
-  --color-surface-bright: #283958;
-  --color-secondary-fixed: #ffdcc2;
-  --color-on-error-container: #ffdad6;
-  --color-secondary-container: #d37b20;
-  --color-inverse-surface: #d7e2ff;
-  --color-surface-container-low: #071b39;
-  --color-tertiary: #cebdff;
-  --color-on-background: #d7e2ff;
-  --color-tertiary-container: #b59cff;
-  --color-surface-dim: #001330;
-  --color-outline: #879399;
-  --color-on-secondary-container: #432100;
-  --color-background: #001330;
-  --color-primary-container: #18b9e8;
-  --color-on-tertiary-fixed: #21005e;
-  --color-surface-container-high: #182a48;
-  --color-outline-variant: #3d484e;
-  --color-error-container: #93000a;
-  --color-on-secondary-fixed: #2e1500;
-  --color-on-tertiary-fixed-variant: #4f319c;
-  --color-surface: #001330;
-  --color-surface-container-lowest: #000e26;
-  --color-primary-fixed-dim: #61d4ff;
-  --color-on-error: #690005;
-  --color-on-secondary: #4c2700;
-  --color-on-primary-fixed-variant: #004d63;
-  --color-on-tertiary-container: #472894;
-  --color-surface-container-highest: #233553;
-  --color-on-primary-fixed: #001f29;
-  --color-on-surface-variant: #bcc8cf;
 }
