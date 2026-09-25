@@ -348,6 +348,26 @@ function ScenarioBuilder({ onResult }) {
 
       if (optimizationResult.geometry) {
         setRouteGeometry(optimizationResult.geometry);
+      } else if (optimizationResult.routes && runLocations.length > 0) {
+        const locMap = {};
+        runLocations.forEach((l, idx) => {
+          locMap[idx] = [l.longitude, l.latitude];
+        });
+        const features = (optimizationResult.routes || [])
+          .filter((r) => Array.isArray(r) && r.length >= 2)
+          .map((route, vIdx) => ({
+            type: "Feature",
+            properties: { vehicle_index: vIdx + 1, route },
+            geometry: {
+              type: "LineString",
+              coordinates: route.map((id) => locMap[id]).filter(Boolean),
+            },
+          }))
+          .filter((f) => f.geometry.coordinates.length >= 2);
+
+        if (features.length > 0) {
+          setRouteGeometry({ type: "FeatureCollection", features });
+        }
       }
 
       if (onResult) onResult(optimizationResult);
@@ -445,7 +465,9 @@ function ScenarioBuilder({ onResult }) {
 
             {routeGeometry && (
               <GeoJSON
-                key={result?.run_id || "route"}
+                key={`route-${result?.run_id || "custom"}-${JSON.stringify(
+                  (routeGeometry.features || []).map((f) => f.geometry?.coordinates?.length)
+                )}`}
                 data={{
                   type: "FeatureCollection",
                   features: routeGeometry.features || [],

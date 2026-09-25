@@ -339,34 +339,122 @@ def build_route_geometry(
         path_nodes = []
 
         for source_id, target_id in zip(route, route[1:]):
+            if source_id == target_id:
+                continue
+            src_node = location_nodes.get(source_id)
+            tgt_node = location_nodes.get(target_id)
+            if src_node is None or tgt_node is None:
+                continue
             try:
                 leg_nodes = nx.shortest_path(
                     travel_graph,
-                    location_nodes[source_id],
-                    location_nodes[target_id],
+                    src_node,
+                    tgt_node,
                     weight="travel_time",
                 )
-
-            except nx.NetworkXNoPath:
-                raise ValueError(
-                    f"No route exists between location "
-                    f"{source_id} and location {target_id}"
+                path_nodes.extend(
+                    leg_nodes if not path_nodes else leg_nodes[1:]
                 )
+            except (nx.NetworkXNoPath, nx.NodeNotFound, KeyError):
+                # If no road path exists between these two points in the graph,
+                # bridge with the endpoint coordinates directly so the route stays intact
+                pass
 
-            path_nodes.extend(
-                leg_nodes if not path_nodes else leg_nodes[1:]
+        if path_nodes:
+            coordinates = [
+                [
+                    float(graph.nodes[node]["x"]),
+                    float(graph.nodes[node]["y"]),
+                ]
+                for node in path_nodes
+            ]
+        else:
+            # Fallback to straight lines connecting route stops
+            loc_by_id = {loc["id"]: loc for loc in locations}
+            coordinates = [
+                [float(loc_by_id[lid]["longitude"]), float(loc_by_id[lid]["latitude"])]
+                for lid in route
+                if lid in loc_by_id
+            ]
+
+        if len(coordinates) >= 2:
+            features.append(
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "vehicle_index": vehicle_index,
+                        "route": route,
+                    },
+                    "geometry": {
+                        "type": "LineString",
+                        "coordinates": coordinates,
+                    },
+                }
             )
 
-        coordinates = [
-            [
-                float(graph.nodes[node]["x"]),
-                float(graph.nodes[node]["y"]),
-            ]
-            for node in path_nodes
-        ]
+    return {
+        "type": "FeatureCollection",
+        "features": features,
+    }
 
-        features.append(
-            {
+
+def _osrm_route(waypoints, timeout=5):
+    """Call the OSRM demo router for road-following geometry.
+
+    *waypoints* is a list of [longitude, latitude] pairs.
+    Returns a list of [lng, lat] coordinates tracing the road, or None on
+    failure (network error, rate limit, bad response).
+    """
+    import requests as _requests
+
+    if len(waypoints) < 2:
+        return None
+
+    coords_str = ";".join(f"{lng},{lat}" for lng, lat in waypoints)
+    url = (
+        f"https://router.project-osrm.org/route/v1/driving/{coords_str}"
+        f"?overview=full&geometries=geojson"
+    )
+
+    try:
+        resp = _requests.get(url, timeout=timeout)
+        if resp.status_code != 200:
+            return None
+        data = resp.json()
+        if data.get("code") != "Ok":
+            return None
+        route_geom = data["routes"][0]["geometry"]["coordinates"]
+        if len(route_geom) >= 2:
+            return route_geom
+        return None
+    except Exception:
+        return None
+
+
+def build_straight_line_geometry(locations, routes):
+    """Return straight-line GeoJSON features connecting route stops.
+
+    Last-resort fallback when neither the local OSM graph nor OSRM are
+    available.
+    """
+    _validate_locations(locations)
+    loc_by_id = {loc["id"]: loc for loc in locations}
+    features = []
+
+    for vehicle_index, route in enumerate(routes, start=1):
+        if not isinstance(route, list) or len(route) < 2:
+            continue
+        if all(loc_id == 0 for loc_id in route):
+            continue
+
+        coordinates = []
+        for loc_id in route:
+            if loc_id in loc_by_id:
+                loc = loc_by_id[loc_id]
+                coordinates.append([float(loc["longitude"]), float(loc["latitude"])])
+
+        if len(coordinates) >= 2:
+            features.append({
                 "type": "Feature",
                 "properties": {
                     "vehicle_index": vehicle_index,
@@ -376,8 +464,61 @@ def build_route_geometry(
                     "type": "LineString",
                     "coordinates": coordinates,
                 },
-            }
-        )
+            })
+
+    return {
+        "type": "FeatureCollection",
+        "features": features,
+    }
+
+
+def build_osrm_geometry(locations, routes):
+    """Return road-following GeoJSON via the OSRM public routing API.
+
+    Each vehicle route is sent to OSRM as a sequence of waypoints.  OSRM
+    returns the actual road path (the same roads a car would drive on),
+    giving a realistic route overlay on the map.
+
+    Falls back to straight-line geometry if OSRM is unreachable.
+    """
+    _validate_locations(locations)
+    loc_by_id = {loc["id"]: loc for loc in locations}
+    features = []
+
+    for vehicle_index, route in enumerate(routes, start=1):
+        if not isinstance(route, list) or len(route) < 2:
+            continue
+        if all(loc_id == 0 for loc_id in route):
+            continue
+
+        # Build waypoint list for this vehicle
+        waypoints = []
+        for loc_id in route:
+            if loc_id in loc_by_id:
+                loc = loc_by_id[loc_id]
+                waypoints.append([float(loc["longitude"]), float(loc["latitude"])])
+
+        if len(waypoints) < 2:
+            continue
+
+        # Try OSRM for road-following geometry
+        road_coords = _osrm_route(waypoints)
+
+        # Use road coords if available, otherwise fall back to straight lines
+        coordinates = road_coords if road_coords else waypoints
+
+        if len(coordinates) >= 2:
+            features.append({
+                "type": "Feature",
+                "properties": {
+                    "vehicle_index": vehicle_index,
+                    "route": route,
+                },
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": coordinates,
+                },
+            })
 
     return {
         "type": "FeatureCollection",

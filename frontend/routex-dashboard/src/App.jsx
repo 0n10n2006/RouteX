@@ -156,8 +156,10 @@ const runOptimization = async () => {
     setActiveView("optimization");
     
 
-    // Fetch road geometry for OSM-backed scenarios
-    if (isOsmRun(optimizationResult) && optimizationResult.run_id) {
+    // Use inline geometry if returned, otherwise fetch for runs with location data
+    if (optimizationResult.geometry) {
+      setRouteGeometry(optimizationResult.geometry);
+    } else if (isOsmRun(optimizationResult) && optimizationResult.run_id) {
       try {
         console.log(
           "Fetching geometry for run:",

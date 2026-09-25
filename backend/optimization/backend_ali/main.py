@@ -48,7 +48,12 @@ from ..traffic_scenarios import (
     create_larger_area_problem,
 )
 from traffic.live_traffic import LiveTrafficError
-from traffic.graph_builder import build_route_geometry, build_route_matrix
+from traffic.graph_builder import (
+    build_route_geometry,
+    build_route_matrix,
+    build_osrm_geometry,
+    build_straight_line_geometry,
+)
 from traffic.osm_loader import load_prepared_road_network, prepare_graph
 from .database import (
     create_tables,
@@ -676,7 +681,9 @@ def optimize_custom(request: CustomOptimizeRequest, user: dict = Depends(get_cur
     def _try_download(mirror_url):
         """Download graph from a single mirror (runs in thread for timeout)."""
         ox.settings.overpass_url = mirror_url
-        ox.settings.requests_timeout = 10
+        ox.settings.overpass_rate_limit = False
+        ox.settings.requests_timeout = 4
+        ox.settings.overpass_settings = "[out:json][timeout:4]{maxsize}"
         g = ox.graph_from_point(
             (center_lat, center_lng),
             dist=radius,
@@ -686,13 +693,14 @@ def optimize_custom(request: CustomOptimizeRequest, user: dict = Depends(get_cur
         return prepare_graph(g)
 
     for mirror_url in OVERPASS_MIRRORS:
+        pool = ThreadPoolExecutor(max_workers=1)
         try:
-            # Hard 12s wall-clock cap per mirror via thread executor
-            with ThreadPoolExecutor(max_workers=1) as pool:
-                future = pool.submit(_try_download, mirror_url)
-                graph = future.result(timeout=12)
+            future = pool.submit(_try_download, mirror_url)
+            graph = future.result(timeout=5)
+            pool.shutdown(wait=False)
             break  # success
         except (FuturesTimeout, Exception) as error:
+            pool.shutdown(wait=False, cancel_futures=True)
             last_error = error
             continue
 
@@ -772,17 +780,26 @@ def optimize_custom(request: CustomOptimizeRequest, user: dict = Depends(get_cur
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
 
-    # Attach geometry inline so frontend has it immediately
-    if not used_haversine_fallback:
+    # Build route geometry: try OSM road network first; fall back to straight lines
+    geometry = None
+    if graph is not None and not used_haversine_fallback:
         try:
             geometry = build_route_geometry(
                 graph, locations, result["routes"],
             )
-            result["geometry"] = geometry
+            # Ensure it produced features
+            if not geometry.get("features"):
+                geometry = None
         except Exception:
-            result["geometry"] = None
-    else:
-        result["geometry"] = None
+            geometry = None
+
+    if geometry is None:
+        geometry = build_osrm_geometry(locations, result["routes"])
+
+    geometry["locations"] = locations
+    geometry["run_id"] = result.get("run_id")
+    geometry["scenario"] = "custom"
+    result["geometry"] = geometry
 
     return result
 
@@ -907,22 +924,21 @@ def result_convergence(run_id: int):
 
 @app.get("/results/{run_id}/geometry")
 def result_geometry(run_id: int):
-    """Return real OSM road geometry for each vehicle route as GeoJSON.
+    """Return OSM road geometry or straight-line route geometry as GeoJSON.
 
-    Only OSM-backed runs (Kothrud, the larger area extract, ...) include the
-    required source locations and OSM file. Matrix-only scenarios
-    intentionally cannot invent map geometry.
+    Works for both OSM-backed runs (Kothrud, larger area) and custom-location
+    runs. Matrix-only scenarios intentionally cannot invent map geometry.
     """
     row = get_result(run_id)
     if row is None:
         raise HTTPException(status_code=404, detail=f"No run with id {run_id}")
 
     metadata = row.get("traffic_metadata") or {}
-    osm_file = metadata.get("osm_file")
-    if not osm_file or not metadata.get("locations"):
+    locations = metadata.get("locations")
+    if not locations:
         raise HTTPException(
             status_code=422,
-            detail="Road geometry is available only for OSM-backed runs",
+            detail="Road geometry is available only for runs with location data",
         )
 
     incident = metadata.get("incident") or {}
@@ -932,23 +948,31 @@ def result_geometry(run_id: int):
             tuple(incident["edge"]): incident.get("speed_factor", 1.0)
         }
 
-    try:
-        graph = load_prepared_road_network(osm_file)
-        geometry = build_route_geometry(
-            graph,
-            metadata["locations"],
-            row["routes"],
-            traffic_factors=metadata.get("traffic_factors"),
-            incident_edges=incident_edges,
-        )
-    except (KeyError, ValueError) as error:
-        raise HTTPException(status_code=422, detail=str(error))
+    geometry = None
+    osm_file = metadata.get("osm_file")
+    if osm_file and os.path.exists(osm_file):
+        try:
+            graph = load_prepared_road_network(osm_file)
+            geometry = build_route_geometry(
+                graph,
+                locations,
+                row["routes"],
+                traffic_factors=metadata.get("traffic_factors"),
+                incident_edges=incident_edges,
+            )
+            if not geometry.get("features"):
+                geometry = None
+        except Exception:
+            geometry = None
+
+    if geometry is None:
+        geometry = build_osrm_geometry(locations, row["routes"])
 
     return {
         **geometry,
         "run_id": run_id,
         "scenario": row["scenario"],
-        "locations": metadata["locations"],
+        "locations": locations,
         "incident": incident or None,
     }
 
