@@ -507,6 +507,8 @@ const runOptimization = async () => {
    DASHBOARD
 ========================================================= */
 
+// Retained while the Scenario Builder replaces the former dashboard route.
+// eslint-disable-next-line no-unused-vars
 function DashboardView({
   result,
   lastUpdated,

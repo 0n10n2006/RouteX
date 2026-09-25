@@ -716,10 +716,8 @@ def optimize_custom(request: CustomOptimizeRequest, user: dict = Depends(get_cur
 
     # Fallback: if all Overpass mirrors failed, build straight-line
     # (haversine) distance/time matrices so the optimizer still works.
-    used_haversine_fallback = False
-    if graph is None:
-        used_haversine_fallback = True
-
+    used_haversine_fallback = graph is None and not request.use_live_traffic
+    if used_haversine_fallback:
         def _haversine_m(lat1, lon1, lat2, lon2):
             """Great-circle distance between two points in metres."""
             R = 6_371_000  # Earth radius in metres
@@ -915,9 +913,8 @@ def optimize_custom_compare(request: CompareRequest, user: dict = Depends(get_cu
             continue
 
     # Build matrices
-    used_haversine_fallback = False
-    if graph is None:
-        used_haversine_fallback = True
+    used_haversine_fallback = graph is None and not request.use_live_traffic
+    if used_haversine_fallback:
         def _haversine_m(lat1, lon1, lat2, lon2):
             R = 6_371_000
             phi1, phi2 = radians(lat1), radians(lat2)
@@ -959,6 +956,7 @@ def optimize_custom_compare(request: CompareRequest, user: dict = Depends(get_cu
         travel_time_matrix = fallback_time
         matrix_metadata = {"distance_unit": "metres", "travel_time_unit": "seconds"}
         source_label = "Custom (haversine fallback)"
+        osm_source_label = "haversine_fallback"
     else:
         try:
             matrix_data = build_route_matrix(graph, locations)
@@ -968,6 +966,7 @@ def optimize_custom_compare(request: CompareRequest, user: dict = Depends(get_cu
         travel_time_matrix = matrix_data["travel_time_matrix"]
         matrix_metadata = matrix_data["metadata"]
         source_label = "Custom (OSM road network)"
+        osm_source_label = "osmnx.graph_from_point"
 
     problem = ProblemInstance(
         distance_matrix=distance_matrix,
@@ -977,7 +976,7 @@ def optimize_custom_compare(request: CompareRequest, user: dict = Depends(get_cu
         metadata={
             **matrix_metadata,
             "source": source_label,
-            "osm_source": "osmnx.graph_from_point" if not used_haversine_fallback else "haversine_fallback",
+            "osm_source": osm_source_label,
             "traffic_factors": None,
             "locations": locations,
             "incident": None,
@@ -1556,4 +1555,3 @@ def delete_depot(depot_id: int, user: dict = Depends(get_current_user)):
     conn.close()
     
     return {"status": "ok"}
-
