@@ -48,7 +48,7 @@ from ..traffic_scenarios import (
     resolve_kothrud_incident,
     create_larger_area_problem,
 )
-from traffic.live_traffic import LiveTrafficError
+from traffic.live_traffic import LiveTrafficError, build_tomtom_live_matrix
 from traffic.graph_builder import (
     build_route_geometry,
     build_route_matrix,
@@ -193,6 +193,7 @@ class CustomOptimizeRequest(BaseModel):
     vehicles: list[CustomVehicle]
     algorithm: str = "qpso"
     seed: int | None = None
+    use_live_traffic: bool = False
 
 
 class CompareRequest(BaseModel):
@@ -200,6 +201,7 @@ class CompareRequest(BaseModel):
     locations: list[CustomLocation]
     vehicles: list[CustomVehicle]
     seed: int | None = None
+    use_live_traffic: bool = False
 
 
 class ScenarioRequest(BaseModel):
@@ -678,7 +680,7 @@ def optimize_custom(request: CustomOptimizeRequest, user: dict = Depends(get_cur
     import osmnx as ox
     from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 
-    OVERPASS_MIRRORS = [
+    OVERPASS_MIRRORS = [] if request.use_live_traffic else [
         "https://overpass.kumi.systems/api/interpreter",
         "https://overpass-api.de/api/interpreter",
     ]
@@ -745,8 +747,20 @@ def optimize_custom(request: CustomOptimizeRequest, user: dict = Depends(get_cur
                 fallback_dist[i][j] = road_est
                 fallback_time[i][j] = road_est / AVG_SPEED_MS
 
-    # Build matrices — either from the real road graph or from haversine fallback
-    if used_haversine_fallback:
+    # Build matrices
+    if request.use_live_traffic:
+        try:
+            matrix_data = build_tomtom_live_matrix(locations)
+            distance_matrix = matrix_data["distance_matrix"]
+            travel_time_matrix = matrix_data["travel_time_matrix"]
+            matrix_metadata = matrix_data["metadata"]
+            source_label = "Custom user locations with TomTom live traffic"
+            osm_source_label = "tomtom"
+            used_haversine_fallback = False
+            graph = None
+        except LiveTrafficError as error:
+            raise HTTPException(status_code=503, detail=str(error))
+    elif used_haversine_fallback:
         distance_matrix = fallback_dist
         travel_time_matrix = fallback_time
         matrix_metadata = {
@@ -872,7 +886,7 @@ def optimize_custom_compare(request: CompareRequest, user: dict = Depends(get_cu
     radius = max(half_diagonal * 1.5, 1500)
 
     import osmnx as ox
-    OVERPASS_MIRRORS = [
+    OVERPASS_MIRRORS = [] if request.use_live_traffic else [
         "https://overpass.kumi.systems/api/",
         "https://overpass-api.de/api/",
     ]
@@ -928,7 +942,19 @@ def optimize_custom_compare(request: CompareRequest, user: dict = Depends(get_cu
                 fallback_dist[i][j] = road_est
                 fallback_time[i][j] = road_est / AVG_SPEED_MS
 
-    if used_haversine_fallback:
+    if request.use_live_traffic:
+        try:
+            matrix_data = build_tomtom_live_matrix(locations)
+            distance_matrix = matrix_data["distance_matrix"]
+            travel_time_matrix = matrix_data["travel_time_matrix"]
+            matrix_metadata = matrix_data["metadata"]
+            source_label = "Custom (TomTom live traffic)"
+            osm_source_label = "tomtom"
+            used_haversine_fallback = False
+            graph = None
+        except LiveTrafficError as error:
+            raise HTTPException(status_code=503, detail=str(error))
+    elif used_haversine_fallback:
         distance_matrix = fallback_dist
         travel_time_matrix = fallback_time
         matrix_metadata = {"distance_unit": "metres", "travel_time_unit": "seconds"}

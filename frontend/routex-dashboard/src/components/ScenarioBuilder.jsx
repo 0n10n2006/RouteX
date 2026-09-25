@@ -89,6 +89,7 @@ function ScenarioBuilder({ onResult }) {
     { id: 2, capacity: 10 },
   ]);
   const [algorithm, setAlgorithm] = useState("qpso");
+  const [useLiveTraffic, setUseLiveTraffic] = useState(false);
   const [loading, setLoading] = useState(false);
   const [compareLoading, setCompareLoading] = useState(false);
   const [error, setError] = useState("");
@@ -383,6 +384,7 @@ function ScenarioBuilder({ onResult }) {
         vehicles: vehicles.map((v) => ({ id: v.id, capacity: v.capacity })),
         algorithm,
         seed: 42,
+        use_live_traffic: useLiveTraffic,
       });
 
       const optimizationResult = res.data;
@@ -445,6 +447,7 @@ function ScenarioBuilder({ onResult }) {
         locations: buildPayloadLocations(),
         vehicles: vehicles.map((v) => ({ id: v.id, capacity: v.capacity })),
         seed: 42,
+        use_live_traffic: useLiveTraffic,
       });
 
       const results = res.data;
@@ -845,6 +848,18 @@ function ScenarioBuilder({ onResult }) {
                 </option>
               ))}
             </select>
+
+            <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                type="checkbox"
+                id="liveTrafficToggle"
+                checked={useLiveTraffic}
+                onChange={(e) => setUseLiveTraffic(e.target.checked)}
+              />
+              <label htmlFor="liveTrafficToggle" style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>
+                Use Live Traffic (TomTom)
+              </label>
+            </div>
 
             <button
               className="primary-button full-width"
