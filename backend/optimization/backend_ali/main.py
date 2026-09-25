@@ -194,6 +194,13 @@ class CustomOptimizeRequest(BaseModel):
     seed: int | None = None
 
 
+class CompareRequest(BaseModel):
+    """Run all algorithms on the same problem for side-by-side comparison."""
+    locations: list[CustomLocation]
+    vehicles: list[CustomVehicle]
+    seed: int | None = None
+
+
 class ScenarioRequest(BaseModel):
     name: str
     distance_matrix: list
@@ -802,6 +809,186 @@ def optimize_custom(request: CustomOptimizeRequest, user: dict = Depends(get_cur
     result["geometry"] = geometry
 
     return result
+
+
+@app.post("/optimize/custom/compare")
+def optimize_custom_compare(request: CompareRequest, user: dict = Depends(get_current_user)):
+    """Run ALL algorithms on the same user-provided locations.
+
+    Returns a list of results (one per algorithm) with the same fields as
+    /optimize/custom, plus convergence data for QPSO and Hybrid QPSO.
+    The road network is downloaded once and shared across all runs.
+    """
+    user_id = user['uid'] if user else None
+
+    if len(request.locations) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="At least 2 locations are needed (1 depot + 1 customer)",
+        )
+
+    depots = [loc for loc in request.locations if loc.type == "depot"]
+    customers_raw = [loc for loc in request.locations if loc.type == "customer"]
+    if len(depots) != 1:
+        raise HTTPException(status_code=400, detail="Exactly one depot is required")
+    if not customers_raw:
+        raise HTTPException(status_code=400, detail="At least one customer location is required")
+    if not request.vehicles:
+        raise HTTPException(status_code=400, detail="At least one vehicle is required")
+
+    # Re-index: depot=0, customers=1..N
+    depot = depots[0]
+    locations = [
+        {"id": 0, "name": depot.name or "Depot",
+         "latitude": depot.latitude, "longitude": depot.longitude},
+    ]
+    problem_customers = []
+    for i, cust in enumerate(customers_raw, start=1):
+        locations.append({
+            "id": i,
+            "name": cust.name or f"Customer {i}",
+            "latitude": cust.latitude,
+            "longitude": cust.longitude,
+        })
+        problem_customers.append({"id": i, "demand": max(cust.demand, 1)})
+
+    problem_vehicles = [
+        {"id": v.id, "capacity": max(v.capacity, 1)} for v in request.vehicles
+    ]
+
+    # Download OSM road network covering all points (ONCE for all algorithms)
+    lats = [loc["latitude"] for loc in locations]
+    lngs = [loc["longitude"] for loc in locations]
+    center_lat = (min(lats) + max(lats)) / 2
+    center_lng = (min(lngs) + max(lngs)) / 2
+
+    from math import radians, cos, sqrt, asin, sin
+    dlat = max(lats) - min(lats)
+    dlng = max(lngs) - min(lngs)
+    lat_m = dlat * 111320
+    lng_m = dlng * 111320 * cos(radians(center_lat))
+    half_diagonal = sqrt(lat_m ** 2 + lng_m ** 2) / 2
+    radius = max(half_diagonal * 1.5, 1500)
+
+    import osmnx as ox
+    OVERPASS_MIRRORS = [
+        "https://overpass.kumi.systems/api/",
+        "https://overpass-api.de/api/",
+    ]
+
+    graph = None
+    last_error = None
+    for mirror_url in OVERPASS_MIRRORS:
+        pool = ThreadPoolExecutor(max_workers=1)
+        try:
+            def _try_dl(url=mirror_url):
+                ox.settings.overpass_endpoint = url
+                ox.settings.overpass_rate_limit = False
+                ox.settings.timeout = 4
+                g = ox.graph_from_point(
+                    (center_lat, center_lng), dist=radius,
+                    network_type="drive", simplify=True,
+                )
+                return prepare_graph(g)
+            future = pool.submit(_try_dl)
+            graph = future.result(timeout=5)
+            pool.shutdown(wait=False)
+            break
+        except Exception as error:
+            pool.shutdown(wait=False, cancel_futures=True)
+            last_error = error
+            continue
+
+    # Build matrices
+    used_haversine_fallback = False
+    if graph is None:
+        used_haversine_fallback = True
+        def _haversine_m(lat1, lon1, lat2, lon2):
+            R = 6_371_000
+            phi1, phi2 = radians(lat1), radians(lat2)
+            dphi = radians(lat2 - lat1)
+            dlam = radians(lon2 - lon1)
+            a = sin(dphi / 2) ** 2 + cos(phi1) * cos(phi2) * sin(dlam / 2) ** 2
+            return R * 2 * asin(sqrt(a))
+
+        n = len(locations)
+        fallback_dist = [[0.0] * n for _ in range(n)]
+        fallback_time = [[0.0] * n for _ in range(n)]
+        AVG_SPEED_MS = 30 * 1000 / 3600
+        for i in range(n):
+            for j in range(n):
+                if i == j:
+                    continue
+                d = _haversine_m(
+                    locations[i]["latitude"], locations[i]["longitude"],
+                    locations[j]["latitude"], locations[j]["longitude"],
+                )
+                road_est = d * 1.4
+                fallback_dist[i][j] = road_est
+                fallback_time[i][j] = road_est / AVG_SPEED_MS
+
+    if used_haversine_fallback:
+        distance_matrix = fallback_dist
+        travel_time_matrix = fallback_time
+        matrix_metadata = {"distance_unit": "metres", "travel_time_unit": "seconds"}
+        source_label = "Custom (haversine fallback)"
+    else:
+        try:
+            matrix_data = build_route_matrix(graph, locations)
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error))
+        distance_matrix = matrix_data["distance_matrix"]
+        travel_time_matrix = matrix_data["travel_time_matrix"]
+        matrix_metadata = matrix_data["metadata"]
+        source_label = "Custom (OSM road network)"
+
+    problem = ProblemInstance(
+        distance_matrix=distance_matrix,
+        travel_time_matrix=travel_time_matrix,
+        vehicles=problem_vehicles,
+        customers=problem_customers,
+        metadata={
+            **matrix_metadata,
+            "source": source_label,
+            "osm_source": "osmnx.graph_from_point" if not used_haversine_fallback else "haversine_fallback",
+            "traffic_factors": None,
+            "locations": locations,
+            "incident": None,
+        },
+    )
+
+    # Run ALL algorithms on the same problem
+    results = []
+    for algo in ALL_ALGORITHMS:
+        try:
+            algo_result = run_and_save(
+                algo, "custom", problem, seed=request.seed, user_id=user_id
+            )
+        except ValueError:
+            continue
+
+        # Build geometry for this algorithm's routes
+        geometry = None
+        if graph is not None and not used_haversine_fallback:
+            try:
+                geometry = build_route_geometry(graph, locations, algo_result["routes"])
+                if not geometry.get("features"):
+                    geometry = None
+            except Exception:
+                geometry = None
+
+        if geometry is None:
+            geometry = build_osrm_geometry(locations, algo_result["routes"])
+
+        geometry["locations"] = locations
+        geometry["run_id"] = algo_result.get("run_id")
+        geometry["scenario"] = "custom"
+        algo_result["geometry"] = geometry
+
+        results.append(algo_result)
+
+    return results
+
 
 
 @app.post("/optimize/kothrud-incident")
