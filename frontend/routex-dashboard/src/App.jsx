@@ -295,7 +295,7 @@ const runOptimization = async () => {
     try {
       await signOut(auth);
       setDemoMode(false);
-      navigate("dashboard");
+      navigate("builder");
     } catch (err) {
       console.error(err);
     }
@@ -333,16 +333,6 @@ const runOptimization = async () => {
           >
             <span className="nav-icon">✦</span>
             <span>Scenario Builder</span>
-          </button>
-
-          <button
-            className={`nav-item ${
-              activeView === "dashboard" ? "active" : ""
-            }`}
-            onClick={() => navigate("dashboard")}
-          >
-            <span className="nav-icon">▦</span>
-            <span>Dashboard</span>
           </button>
 
           <button
@@ -441,25 +431,7 @@ const runOptimization = async () => {
             </div>
           )}
 
-          {/* DASHBOARD */}
-          {activeView === "dashboard" && (
-            <DashboardView
-              result={result}
-              lastUpdated={lastUpdated}
-              history={history}
-              comparison={scenarioComparison}
-              loading={loading}
-              algorithm={algorithm}
-              scenario={scenario}
-              setAlgorithm={setAlgorithm}
-              setScenario={setScenario}
-              runOptimization={runOptimization}
-              navigate={navigate}
-              convergenceData={convergenceData}
-              bestFitness={bestFitness}
-              loadHistoricalResult={loadHistoricalResult}
-            />
-          )}
+
 
           {/* SCENARIO BUILDER */}
           {activeView === "builder" && (

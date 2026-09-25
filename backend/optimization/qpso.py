@@ -222,9 +222,13 @@ class QPSO:
             fitness_function
         )
 
-        self.convergence.append(
-            self.global_best_fitness
+        # Track the best fitness found in THIS iteration to show a dynamic 
+        # convergence curve, rather than a flat line of the global best.
+        iteration_best = min(
+            (p.fitness for p in self.particles),
+            default=self.global_best_fitness
         )
+        self.convergence.append(iteration_best)
 
     def get_best_solution(self, problem):
 
